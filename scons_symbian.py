@@ -100,7 +100,7 @@ def SymbianPackage( package, ensymbleargs = None, pkgfile=None ):
                 try:
                     simplesis( "scons", cmd )
                 except Exception, msg:
-                    return Exception, msg
+                    return str(msg)
             
             return Command( package, installed, ensymble, ENV = os.environ )
         
