@@ -2,7 +2,7 @@
 
 import textwrap
 from arguments import *
-import spawn
+#import spawn
 
 from SCons.Environment import Environment
 
@@ -125,6 +125,6 @@ def create_environment(  target,
 
                 )
     #env["SPAWN"] = spawn.SubprocessSpawn()
-    env["SPAWN"] = spawn.win32_spawn
+    #env["SPAWN"] = spawn.win32_spawn
 
     return env

@@ -22,7 +22,7 @@ from arguments import *
 import winscw
 import gcce
 import colorizer
-#if colorizer.CONSOLE is not None:
+
 OUTPUT_COLORIZER = colorizer.OutputConsole(  )
     
 #: Easy constant for free caps

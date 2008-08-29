@@ -73,6 +73,18 @@ LINECOUNTS = LineCounts()
 #: Original sys.stdout
 savedstdout = sys.stdout
 
+def subsitute_env_vars(line, env):
+    """ Substitutes environment variables in the command line.
+    
+    E.g. dir %EPOCROOT% -> dir T:\
+    
+    The command line does not seem to do this automatically when launched
+    via subprocess.
+    """
+    for key,value in env.items():
+        line = line.replace("%%%s%%" % key, value)
+    return line
+    
 def write( line, color ):
     """Write line with color"""
     global CONSOLE
@@ -142,11 +154,16 @@ class OutputConsole(ConsoleBase):
         external processes
         """
 
-        args = [ x.replace('"', '' ) for x in args ]
-
+        args = [ subsitute_env_vars( x.replace('"', '' ), env ) for x in args ]    
+        
+        # Long command support <= 32766
+        startupinfo          = sp.STARTUPINFO()
+        startupinfo.dwFlags |= sp.STARTF_USESHOWWINDOW
+        
         p = sp.Popen( args, bufsize = 1,
                       stdout = sp.PIPE, stderr=sp.STDOUT,
-                      shell = True, env = env)
+                      startupinfo = startupinfo,
+                      shell = False, env = env)
 
         out, err = p.communicate( )
         self.write( out )

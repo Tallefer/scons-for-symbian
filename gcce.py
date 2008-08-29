@@ -15,7 +15,7 @@ from os import path
 from os.path import join
 
 from arguments import *
-import spawn
+#import spawn
 
 from SCons.Builder     import Builder
 from SCons.Environment import Environment
@@ -252,6 +252,6 @@ def create_environment( target,
                      )
     env.Append( BUILDERS = { "Elf" : elf2e32_builder } )
     
-    env["SPAWN"] = spawn.win32_spawn
+    #env["SPAWN"] = spawn.win32_spawn
     
     return env
