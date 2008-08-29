@@ -69,8 +69,8 @@ def create_environment( *args, **kwargs ):
         msg = "Error: Environment for '%s' is not implemented" % COMPILER
         raise NotImplemented( msg )
     return env
- 
-def SymbianPackage( package, ensymbleargs = None, pkgfile=None ):
+
+def SymbianPackage( package, ensymbleargs = None, pkgfile=None):
     """
     Create Symbian Installer( sis ) file. Can use either Ensymble or pkg file.
     @param package: Name of the package.
@@ -89,21 +89,24 @@ def SymbianPackage( package, ensymbleargs = None, pkgfile=None ):
         from ensymble.cmd_simplesis import run as simplesis
         
         cmd = []
-        
+
+        def ensymble( env, target = None, source = None ):
+            """ Wrap ensymble simplesis command. """
+            try:
+                print "Running simplesis:" + str(cmd)
+                simplesis( "scons", cmd )
+            except Exception, msg:
+                return str(msg)
+                                    
         if pkgfile is None and ENSYMBLE_AVAILABLE:
-             
+                            
             for x in ensymbleargs:
                 cmd += [ "%s=%s" % ( x, ensymbleargs[x] ) ]
             cmd += [ join( PACKAGE_FOLDER, package ), package ]
-            
-            def ensymble( env, target = None, source = None ):
-                try:
-                    simplesis( "scons", cmd )
-                except Exception, msg:
-                    return str(msg)
+                            
             
             return Command( package, installed, ensymble, ENV = os.environ )
-        
+                            
         elif pkgfile is not None:
             cmd = "makesis %s %s" % ( pkgfile, package )
             return Command( package, installed + [pkgfile], cmd, ENV = os.environ )
@@ -119,7 +122,8 @@ def SymbianProgram( target, targettype = None,
                     icons = None, resources = None,
                     rssdefines = None, 
                     # Sis stuff
-                    package  = "",                 
+                    package  = "",
+                    extra_depends=[],                 
                     **kwargs ):
     """
     Compiles sources using selected compiler.
@@ -131,6 +135,7 @@ def SymbianProgram( target, targettype = None,
     @param capabilities: Used capabilities. Default: FREE_CAPS
     @param rssdefines: Preprocessor definitions for resource compiler.
     @param package: Path to installer file. If given, an installer is created automatically.
+    @param extra_depends: External files which must be built prior the app
     @param **kwargs: Keywords passed to C{create_environment()}
     @return: Last Command. For setting dependencies.
     """
@@ -514,6 +519,9 @@ def SymbianProgram( target, targettype = None,
 
         libfolder = "%EPOCROOT%epoc32/release/winscw/udeb/"
         libs      = [ libfolder + x for x in libraries]
+        
+        for dep in extra_depends:
+            env.Depends(build_prog, dep)
 
         if targettype in DLL_TARGETTYPES and targettype != TARGETTYPE_LIB:
 

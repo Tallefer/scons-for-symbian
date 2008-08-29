@@ -2,6 +2,7 @@
 
 import textwrap
 from arguments import *
+import spawn
 
 from SCons.Environment import Environment
 
@@ -12,6 +13,7 @@ DEFAULT_WINSCW_DEFINES += [
                         "__WINSCW__"
                         ]
 SYMBIAN_WINSCW_LIBPATHLIB = EPOCROOT + r"epoc32/release/winscw/udeb/"
+
                         
 def create_environment(  target,
                                     targettype,
@@ -90,6 +92,7 @@ def create_environment(  target,
 
 
     COMPILER_INCLUDE = os.path.normpath( EPOCROOT + "/epoc32/include/gcce/gcce.h" )
+        
     env = Environment( 
                     tools = ["mingw"], # Disable searching of tools
                     ENV = os.environ,#os.environ['PATH'],
@@ -118,8 +121,10 @@ def create_environment(  target,
                     LINKFLAGS     = LINKFLAGS,
                     LIBS          = LIBRARIES,
                     LIBLINKPREFIX = " ",
-                    PROGSUFFIX    = "." + targettype
+                    PROGSUFFIX    = "." + targettype,
 
                 )
+    #env["SPAWN"] = spawn.SubprocessSpawn()
+    env["SPAWN"] = spawn.win32_spawn
 
     return env

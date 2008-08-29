@@ -15,6 +15,7 @@ from os import path
 from os.path import join
 
 from arguments import *
+import spawn
 
 from SCons.Builder     import Builder
 from SCons.Environment import Environment
@@ -222,7 +223,14 @@ def create_environment( target,
                     LIBLINKPREFIX = " ",
                     PROGSUFFIX    = ".noelfexe"
                 )
-                
+    
+    # Add GCC binaries to path head, so we are sure to use them instead of some other (Cygwin, Carbide)
+    # TODO: Windows specific
+    env.PrependENVPath('PATH', 'C:\\Program Files\\CSL Arm Toolchain\\libexec\\gcc\\arm-none-symbianelf\\3.4.3')
+    env.PrependENVPath('PATH', 'C:\\Program Files\\CSL Arm Toolchain\\arm-none-symbianelf\\bin')     
+    
+    
+    
     # Add special builders------------------------------------------------------
 
     # Elf2e32 converter
@@ -243,5 +251,7 @@ def create_environment( target,
                        single_source = True,
                      )
     env.Append( BUILDERS = { "Elf" : elf2e32_builder } )
+    
+    env["SPAWN"] = spawn.win32_spawn
     
     return env
