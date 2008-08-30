@@ -15,7 +15,11 @@ def GetArg( name, help, default, allowed_values = None ):
                     ignorecase=2 ) )
     else:
         VARS.Add( name, help, default )            
-    return ARGUMENTS.get( name, default )
+    value = ARGUMENTS.get( name, default )
+    if value is not None:
+        value = value.lower()
+    return value
+    
                 
 # Constants -------------------------------------------------------------------
 #: Symbian SDK folder
