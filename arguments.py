@@ -4,16 +4,30 @@ import sys
 import os
 from os.path import join
 
-from SCons.Script import ARGUMENTS, Options, EnumOption
+from SCons.Script import ARGUMENTS, Options, DefaultEnvironment, EnumOption, Variables, EnumVariable, Help
+VARS = Variables('arguments.py')
 
+def GetArg( name, help, default, allowed_values = None ):
+    """Utility for adding help information and retrieving argument"""
+    if allowed_values is not None:
+        VARS.Add( EnumVariable( name, help, default, 
+                    allowed_values = allowed_values,
+                    ignorecase=2 ) )
+    else:
+        VARS.Add( name, help, default )            
+    return ARGUMENTS.get( name, default )
+                
 # Constants -------------------------------------------------------------------
 #: Symbian SDK folder
 EPOCROOT = os.environ["EPOCROOT"]
 
 COMPILER_WINSCW = "winscw"
 COMPILER_GCCE   = "gcce"
+COMPILERS = [COMPILER_WINSCW, COMPILER_GCCE ]
+
 RELEASE_UREL    = "urel"
 RELEASE_UDEB    = "udeb"
+RELEASETYPES    =  [ RELEASE_UDEB, RELEASE_UREL ]
 
 TARGETTYPE_DLL    = "dll"
 TARGETTYPE_EXE    = "exe"
@@ -68,24 +82,18 @@ if sys.platform == "linux2":
 PATH_ARM_TOOLCHAIN = [ _x for _x in _p.split( os.path.pathsep ) if CSL_ARM_TOOLCHAIN_FOLDER_NAME in _x ][0]
 
 # Parse arguments -------------------------------------------------------------
-opt = Options(None, ARGUMENTS)
-opt.AddOptions(
-         EnumOption(
-          'compiler',
-          'The compiler you want to use',
-          'winscw',
-          ['gcce','gcce'],
-          {'winscw':'winscw'}))
 
-#: Used compiler
-COMPILER   = ARGUMENTS.get( "compiler", COMPILER_WINSCW ).lower()
+COMPILER   = GetArg( "compiler", "The compiler to use.", COMPILER_WINSCW, COMPILERS )
 
-#: Urel/Udeb
-RELEASE    = ARGUMENTS.get( "release",  RELEASE_UDEB ).lower()
+RELEASE    = GetArg( "release", "Release type.", RELEASE_UDEB, RELEASETYPES )
 
+#: Location for the packages
 PACKAGE_FOLDER = join( "%s_%s" % ( COMPILER, RELEASE ), "packages" )
 
-DO_CREATE_SIS = ( ARGUMENTS.get( "dosis",  "False" ).capitalize() == "True" )
+
+DO_CREATE_SIS = GetArg( "dosis", "Create SIS package.", "false", [ "true", "false"] ) 
+DO_CREATE_SIS = DO_CREATE_SIS == "true" 
+
 ENSYMBLE_AVAILABLE = False
 try:
     if COMPILER != COMPILER_WINSCW and DO_CREATE_SIS:
@@ -102,13 +110,15 @@ if not DO_CREATE_SIS:
 
 #: Built components. One SConstruct can define multiple SymbianPrograms.
 #: This can be used from command-line to build only certain SymbianPrograms
-COMPONENTS = ARGUMENTS.get( "components",  None )
+COMPONENTS = GetArg( "components", "Components to build. Separate with ','.", "all" )
+COMPONENTS = ( None if COMPONENTS == "all" else COMPONENTS )  
+
 if COMPONENTS is not None:
     COMPONENTS = COMPONENTS.lower().split(",")
 
 def __get_defines():
     "Ensure correct syntax for defined strings"
-    tmp = ARGUMENTS.get( "defines",  None )
+    tmp = GetArg( "defines", "Extra preprocessor defines. For debugging, etc.", None )
     if tmp is None: return []
     tmp = tmp.split(",")
 
@@ -128,7 +138,7 @@ def __get_defines():
 CMD_LINE_DEFINES = __get_defines()
 
 #: Extra libraries( debug library etc. )
-CMD_LINE_LIBS    = ARGUMENTS.get( "extra_libs", None )
+CMD_LINE_LIBS    = GetArg( "extra_libs", "Extra libraries. Debug libraries, etc.", None )
 if CMD_LINE_LIBS is not None: 
     CMD_LINE_LIBS = CMD_LINE_LIBS.split(",")
     
@@ -155,3 +165,28 @@ else:
 
 def get_output_folder(compiler, release, target, targettype ):
     return os.path.join( compiler + "_" + release, target + "_" + targettype )
+
+# Generate help message
+def __generate_help_message():
+    ENV = DefaultEnvironment(variables = VARS )
+    msg = "SCons for Symbian arguments:"
+    msg += "\n" + "=" *  len( msg )
+    msg += VARS.GenerateHelpText(ENV).replace( "\n    a", " | a") 
+    Help( msg )    
+    
+__generate_help_message()
+
+#: Flag for disabling processing to shorten time to display help message
+HELP_ENABLED = False    
+for x in [ "-h", "-H", "--help"]:
+    if x in sys.argv:
+        HELP_ENABLED = True
+        break    
+
+#if VARS.UnknownVariables():
+#   print "Unknown variables:", VARS.UnknownVariables().keys()
+#   print "To avoid this message, add your own"
+#   print "variables with arguments.py->GetArg or use Variables()"
+#   raise SystemExit()
+   
+   

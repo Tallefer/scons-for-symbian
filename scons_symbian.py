@@ -77,7 +77,8 @@ def SymbianPackage( package, ensymbleargs = None, pkgfile=None):
     @param ensymbleargs: Arguments to Ensymble simplesis.
     @param pkgfile: Path to pkg file.
     """                     
-
+    if HELP_ENABLED: return
+    
     if ensymbleargs is not None and pkgfile is not None:
         raise ValueError( "Trying to use both Ensymble and PKG file. Which one do you really want?" )
     else:
@@ -139,7 +140,8 @@ def SymbianProgram( target, targettype = None,
     @param **kwargs: Keywords passed to C{create_environment()}
     @return: Last Command. For setting dependencies.
     """
-
+    if HELP_ENABLED: return
+    
     if target.lower().endswith( ".mmp" ):
         import mmp_parser
         p = mmp_parser.MMPParser( target )
