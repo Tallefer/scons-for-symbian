@@ -185,16 +185,18 @@ def _resolve_platform():
     
     if uiplatform == UI_PLATFORM_S60:
         # 9.2 FP1, 9.3 FP2
-        mapping    = { "9.1" : (3,0), "9.2" : ( 3,1 ), "9.3" : ( 3.2 ) }        
-        uiversion  = mapping[".".join( symbian_version ) ]
+        mapping    = { "91" : (3,0), "92" : ( 3,1 ), "93" : ( 3.2 ) }        
+        uiversion  = mapping[ "".join( symbian_version ) ]
         sdk_header = symbian_header
         
-    return sdk_header, uiplatform, tuple( uiversion ), tuple( symbian_version )
+    return sdk_header, uiplatform,  \
+            tuple( uiversion ),     \
+            tuple( map( int, symbian_version ) )
     
 PLATFORM_HEADER, UI_PLATFORM, UI_VERSION, SYMBIAN_VERSION = _resolve_platform()
           
-print "Info: Symbian OS version =", ".".join( SYMBIAN_VERSION )
-print "Info: UI platform        =", UI_PLATFORM, ".".join( map( str, UI_VERSION ) )
+print "Info: Symbian OS version = %d.%d" % SYMBIAN_VERSION
+print "Info: UI platform        = %s"    % UI_PLATFORM, "%d.%d" % UI_VERSION
         
 #: Built components. One SConstruct can define multiple SymbianPrograms.
 #: This can be used from command-line to build only certain SymbianPrograms
@@ -257,8 +259,11 @@ elif UI_PLATFORM == UI_PLATFORM_UIQ:
     # if you use these defines in your code, it becomes incompatible with them
     # You'll need to add these in your MMP with MACRO    
     DEFAULT_SYMBIAN_DEFINES += [ "__UIQ_%d%d__" % UI_VERSION ]
-    DEFAULT_SYMBIAN_DEFINES += [ "__UIQ_%dX__" % UI_VERSION[0] ]
+    DEFAULT_SYMBIAN_DEFINES += [ "__UIQ_%dX__"  % UI_VERSION[0] ]
     DEFAULT_SYMBIAN_DEFINES += [ "__UIQ__" ]
+
+DEFAULT_SYMBIAN_DEFINES += [ "__SYMBIAN_OS_VERSION__=%d%d" % SYMBIAN_VERSION ]
+DEFAULT_SYMBIAN_DEFINES += [ "__UI_VERSION__=%d%d" % UI_VERSION ]
                                             
 if RELEASE == RELEASE_UREL:
     DEFAULT_SYMBIAN_DEFINES.append( "NDEBUG" )
