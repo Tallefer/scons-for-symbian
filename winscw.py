@@ -59,8 +59,8 @@ def create_environment(  target,
     OUTPUT_FOLDER = get_output_folder( COMPILER, RELEASE, target, targettype )
 
     LIBPATH   = SYMBIAN_WINSCW_LIBPATHLIB
-    LIBRARIES = [ os.path.normpath(LIBPATH + x ).lower() for x in libraries ]
-
+    LIBRARIES = [ os.path.normpath(LIBPATH + x ).lower() for x in libraries ]    
+    
     if defines is None:
         defines = []
     defines.extend( DEFAULT_WINSCW_DEFINES )
@@ -130,7 +130,7 @@ def create_environment(  target,
                    CPPPATH = INCLUDES + includes,
                    CPPDEFINES = defines,
                    #CXXFLAGS   = WINSCW_CC_FLAGS + ' -cwd source -i- -include "Symbian_OS_v9.1.hrh"',
-                   CCFLAGS     = WINSCW_CC_FLAGS + ' -cwd source -i- -include "Symbian_OS_v9.1.hrh"',
+                   CCFLAGS     = WINSCW_CC_FLAGS + ' -cwd source -i- -include "%s"' % os.path.basename( PLATFORM_HEADER ),
                    INCPREFIX  = "-i ",
                    CPPDEFPREFIX = "-d ",
                    # Linker settings

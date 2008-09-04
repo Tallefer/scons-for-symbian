@@ -52,8 +52,10 @@ def SymbianPackage( package, ensymbleargs = None, pkgfile=None):
     
     @param package: Name of the package.
     @type package: str
+    
     @param ensymbleargs: Arguments to Ensymble simplesis.
     @type ensymbleargs: dict 
+    
     @param pkgfile: Path to pkg file.
     @type pkgfile: str
     """  
@@ -124,6 +126,7 @@ def SymbianProgram( target, targettype = None,
     
     @param includes:    List of folders to be used for finding headers.
     @type includes: list
+    
     @param definput:    Path to .def file containing frozen library entrypoints.
     @type definput: str
     
@@ -242,6 +245,7 @@ def SymbianProgram( target, targettype = None,
     
     #-------------------------------------------------------------- Create icons
     # Copy for emulator at the end using this list, just like binaries.
+    #TODO: Create main interface SymbianIcon for generic icons
     def convert_icons():
         if icons is not None:
 
@@ -296,6 +300,7 @@ def SymbianProgram( target, targettype = None,
     converted_icons = convert_icons()
 
     #---------------------------------------------------- Convert resource files
+    #TODO: Create main interface SymbianResource for special resource compiling
     def convert_resources():
         """
         Compile resources and copy for sis creation and for simulator.
@@ -309,7 +314,8 @@ def SymbianProgram( target, targettype = None,
         """
         converted_resources = []
         resource_headers = []
-
+        import rcomp
+        
         if resources is not None:
             # Make the resources dependent on previous resource
             # Thus the resources must be listed in correct order.
@@ -318,30 +324,22 @@ def SymbianProgram( target, targettype = None,
             for rss_path in resources:
                 rss_notype = ".".join(os.path.basename(rss_path).split(".")[:-1]) # ignore rss
                 converted_rsg = join( OUTPUT_FOLDER, "%s.rsg" % rss_notype )
-                converted_rsc = join( OUTPUT_FOLDER, "%s.rsc" % rss_notype )
-                platinc = EPOCROOT + join( "epoc32", "include", "variant", "symbian_os_v9.1.hrh" )
-                import rcomp
-                
-
-                result_paths  = [ ]
-                copyres_cmds = [ ]
-
+                converted_rsc = join( OUTPUT_FOLDER, "%s.rsc" % rss_notype )                
                 converted_resources.append( converted_rsc )
-
-                # Compile resource files
-                #res_compile_command = env.Command( [converted_rsc, converted_rsg], rss_path, cmd )
-                import rcomp
-                
+                                
+                result_paths = [ ]
+                copyres_cmds = [ ]
+                                
                 res_compile_command = rcomp.RComp( env, converted_rsc, converted_rsg,
                              rss_path,
                              "-m045,046,047",
                              includes + INCLUDES,
-                             [platinc],
+                             [PLATFORM_HEADER],
                              rssdefines )
                              
                 env.Depends(res_compile_command, converted_icons)
 
-                includefolder = EPOCROOT + join( "epoc32", "include" )
+                includefolder = EPOC32_INCLUDE
                 
                 installfolder = [ PACKAGE_FOLDER ]
                 if package != "": 
@@ -484,20 +482,20 @@ def SymbianProgram( target, targettype = None,
             resultables.append(resultable_path )
             #resultables.append( TARGET_RESULTABLE % ".inf" )
             output_libpath = ( TARGET_RESULTABLE % ".lib",
-                                EPOCROOT + r"epoc32/release/%s/%s/" % ( COMPILER, RELEASE ) + libname )
+                                join( EPOC32_RELEASE, libname ) )
         
         if targettype != TARGETTYPE_LIB:
             build_prog = env.Program( resultables, sources )
             # Depends on the used libraries. This has a nice effect since if,
             # this project depends on one of the other projects/components/dlls/libs
             # the depended project is automatically built first.
-            env.Depends( build_prog, [ r"/epoc32/release/%s/%s/%s" % ( COMPILER, RELEASE, libname ) for libname in libraries] )
+            env.Depends( build_prog, [ join( EPOC32_RELEASE, libname ) for libname in libraries] )
             env.Depends( build_prog, converted_icons )
             env.Depends( build_prog, resource_headers )
         else:
             build_prog = env.StaticLibrary( TARGET_RESULTABLE % ".lib" , sources )
             output_libpath = ( TARGET_RESULTABLE % ".lib",
-                                join( EPOCROOT + "epoc32", "release", COMPILER, RELEASE, "%s.lib" % ( target ) ) )
+                                join( EPOC32_RELEASE, "%s.lib" % ( target ) ) )
         
         if output_lib and targettype != TARGETTYPE_LIB:
             # Create .inf file

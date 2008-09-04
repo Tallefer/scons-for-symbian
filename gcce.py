@@ -27,9 +27,7 @@ DEFAULT_GCCE_DEFINES += [
                         "__MARM__",
                         "__EABI__",                        
                         "__MARM_ARMV5__",
-                        ("__PRODUCT_INCLUDE__", '"%s"' % \
-                            join( EPOCROOT, 'epoc32', 'include',
-                                  'variant', 'Symbian_OS_v9.1.hrh' ) )
+                        ("__PRODUCT_INCLUDE__", '"%s"' % PLATFORM_HEADER )
                         ]
 
 SYMBIAN_ARMV5_LIBPATH     = [ EPOCROOT ] + "epoc32 release armv5".split()
@@ -119,7 +117,7 @@ def create_environment( target,
     # Cleanup
     libraries = [ x.replace( "\\\\", "/") for x in libraries ]
     
-    COMPILER_INCLUDE = os.path.abspath( EPOCROOT + "epoc32/include/gcce/gcce.h" )
+    COMPILER_INCLUDE = os.path.abspath( join( EPOC32_INCLUDE, "gcce", "gcce.h" ) )
 
     # TODO: Cleanup following mess
     
