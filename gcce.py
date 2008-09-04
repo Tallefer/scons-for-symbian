@@ -57,8 +57,17 @@ def create_environment( target,
                         capabilities = None,
                         defines      = None,
                         allowdlldata = True,
-                        epocstacksize = None ):
+                        epocstacksize = None,
+                        **kwargs ):
     """Create GCCE building environment
+    @param allowdlldata: False to disable dll data support
+    @type  allowdlldata: bool
+    
+    @param epocstacksize: Size of stack for executable.
+    @type  epocstacksize: int
+        
+    @param kwargs: ignored keyword arguments.
+    @see: L{scons_symbian.SymbianProgram}
     """
 
     if defines is None:

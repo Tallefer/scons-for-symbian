@@ -1,4 +1,7 @@
-"""SCons for Symbian - RComp utility"""
+"""RComp utility"""
+
+__author__    = "Jussi Toivola"
+__license__   = "MIT License"
 
 import os
 import sys
@@ -6,6 +9,7 @@ import cpp
 
 from SCons.Script import Command
 
+#: RComp command path
 RCOMP = os.environ["EPOCROOT"] + os.path.join( "epoc32", "tools", "rcomp" )
 if sys.platform == "linux2":
     RCOMP = "wine " + RCOMP + ".exe"

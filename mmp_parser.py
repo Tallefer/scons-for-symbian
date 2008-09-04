@@ -5,6 +5,7 @@ This file is part of SCons for Symbian project.
 """
 __author__    = "Jussi Toivola"
 __license__   = "MIT License"
+
 #TODO: Preprocess the mmp file
 import os
 import sys
@@ -15,10 +16,11 @@ KEYWORDS =  ( "target", "targettype", "library", "source", "systeminclude", "use
               "staticlibary", "epocallowdlldata", "macro", "capability", "epocstacksize",
               "resources", "uid"
             )
-           
-
+                                         
 class MMPParser:
+    """Parse MMP to be built with SCons for Symbian"""
     def __init__( self, sourcefile ):
+        #: Path to the MMP file.
         self.Source = sourcefile
         
     def Parse( self ):
@@ -38,9 +40,7 @@ class MMPParser:
             result[x] = []
         result["epocallowdlldata"] = False # Not enabled with regular scripts either
         
-        for line in lines:
-            #line = lines[x].strip()
-            
+        for line in lines:                        
             parts = line.split()
             keyword = parts[0].lower()
             if keyword in KEYWORDS:

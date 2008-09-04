@@ -16,9 +16,7 @@ def Helloworld():
     libs = ["euser"]
     
     return SymbianProgram( 'helloworld', TARGETTYPE_EXE,
-                            sources, inc, libs,
-
-                            capabilities = FREE_CAPS,
+                            sources, inc, libs
                             defines      = COMMON_DEFINES ) 
  
 Helloworld()

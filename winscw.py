@@ -1,5 +1,8 @@
 """Environment for WINSCW compiler"""
 
+__author__    = "Jussi Toivola"
+__license__   = "MIT License"
+
 import textwrap
 from arguments import *
 #import spawn
@@ -14,6 +17,22 @@ DEFAULT_WINSCW_DEFINES += [
                         ]
 SYMBIAN_WINSCW_LIBPATHLIB = EPOCROOT + r"epoc32/release/winscw/udeb/"
 
+#: UID.cpp for WINSCW simulator
+TARGET_UID_CPP_TEMPLATE_DLL = r"""
+// scons-generated uid source file
+#include <e32cmn.h>
+#pragma data_seg(".SYMBIAN")
+__EMULATOR_IMAGE_HEADER2(0x10000079,0x00000000,0x00000000,EPriorityForeground,0x000ff1b4u,0x00000000u,0x00000000,0,0x00010000,0)
+#pragma data_seg()
+"""
+#: UID.cpp for WINSCW simulator
+TARGET_UID_CPP_TEMPLATE_EXE = r"""
+// scons-generated uid source file
+#include <e32cmn.h>
+#pragma data_seg(".SYMBIAN")
+__EMULATOR_IMAGE_HEADER2(0x1000007a,0x100039ce,%(UID3)s,EPriorityForeground,0x000ff1b4u,0x00000000u,%(UID3)s,0x00000000,0x00010000,0)
+#pragma data_seg()
+"""
                         
 def create_environment(  target,
                                     targettype,
@@ -23,11 +42,13 @@ def create_environment(  target,
                                     uid3,
                                     definput = None,
                                     capabilities = None,
-                                    defines = None,
-                                    allowdlldata  = True,                                    
-                                    epocstacksize = None 
+                                    defines = None, 
+                                    **kwargs  
                                     ):
-    """Create WINSCW environment"""
+    """Create WINSCW environment
+    @param kwargs: ignored keyword arguments.
+    @see: L{scons_symbian.SymbianProgram}
+    """
     # Add .lib if file extension does not exist
     newlibs = []
     for x in xrange( len( libraries ) ):

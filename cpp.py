@@ -1,6 +1,8 @@
 """
-SCons for Symbian - Preprocessor utility
+Preprocessor utility
 """
+__author__    = "Jussi Toivola"
+__license__   = "MIT License"
 
 import os
 import sys

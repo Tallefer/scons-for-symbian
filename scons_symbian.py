@@ -1,8 +1,4 @@
-"""
-SCons for Symbian - SCons build toolchain support for Symbian.
-
-See examples folder for usage.
-"""
+"""Main module"""
 __author__    = "Jussi Toivola"
 __license__   = "MIT License"
 
@@ -23,14 +19,9 @@ import winscw
 import gcce
 import colorizer
 
-OUTPUT_COLORIZER = colorizer.OutputConsole(  )
+#: Handle to console for colorized output( and process launching )
+_OUTPUT_COLORIZER = colorizer.OutputConsole(  )
     
-#: Easy constant for free caps
-FREE_CAPS = "NetworkServices LocalServices ReadUserData " \
-            "WriteUserData Location UserEnvironment PowerMgmt " \
-            "ProtServ SwEvent SurroundingsDD ReadDeviceData " \
-            "WriteDeviceData TrustedUI".split()
-
 # Set EPOCROOT as default target, so the stuff will actually be built.
 Default( EPOCROOT )
     
@@ -38,28 +29,12 @@ Default( EPOCROOT )
 print "Building", COMPILER, RELEASE
 print "Defines", CMD_LINE_DEFINES
 
-#: UID.cpp for WINSCW simulator
-TARGET_UID_CPP_TEMPLATE_DLL = r"""
-// scons-generated uid source file
-#include <e32cmn.h>
-#pragma data_seg(".SYMBIAN")
-__EMULATOR_IMAGE_HEADER2(0x10000079,0x00000000,0x00000000,EPriorityForeground,0x000ff1b4u,0x00000000u,0x00000000,0,0x00010000,0)
-#pragma data_seg()
-"""
-#: UID.cpp for WINSCW simulator
-TARGET_UID_CPP_TEMPLATE_EXE = r"""
-// scons-generated uid source file
-#include <e32cmn.h>
-#pragma data_seg(".SYMBIAN")
-__EMULATOR_IMAGE_HEADER2(0x1000007a,0x100039ce,%(UID3)s,EPriorityForeground,0x000ff1b4u,0x00000000u,%(UID3)s,0x00000000,0x00010000,0)
-#pragma data_seg()
-"""
-
 # in template
 # UID1 = 0x100039ce for exe
 # UID1 = 0x00000000 for dll
 
-def create_environment( *args, **kwargs ):
+def _create_environment( *args, **kwargs ):
+    """Environment factory. Get correct environment for selected compiler."""
     env = None
     if COMPILER == COMPILER_GCCE:
         env = gcce.create_environment( *args, **kwargs )
@@ -73,10 +48,16 @@ def create_environment( *args, **kwargs ):
 def SymbianPackage( package, ensymbleargs = None, pkgfile=None):
     """
     Create Symbian Installer( sis ) file. Can use either Ensymble or pkg file.
+    To enable creation, give command line arg: dosis=true
+    
     @param package: Name of the package.
+    @type package: str
     @param ensymbleargs: Arguments to Ensymble simplesis.
+    @type ensymbleargs: dict 
     @param pkgfile: Path to pkg file.
-    """                     
+    @type pkgfile: str
+    """  
+    # Skip processing to speed up help message                    
     if HELP_ENABLED: return
     
     if ensymbleargs is not None and pkgfile is not None:
@@ -127,19 +108,57 @@ def SymbianProgram( target, targettype = None,
                     extra_depends=[],                 
                     **kwargs ):
     """
-    Compiles sources using selected compiler.
-    Converts resource files.
-    Converts icon files.
-    @param target: Name of the module without file extension.
-                   If the file ends with .mmp, the .mmp file is used for defining the module. 
-    @param libraries: Used libraries.
-    @param capabilities: Used capabilities. Default: FREE_CAPS
-    @param rssdefines: Preprocessor definitions for resource compiler.
-    @param package: Path to installer file. If given, an installer is created automatically.
+    Main function for compiling Symbian software. Handles the whole process
+    of source and resource compiling and SIS installer packaging. 
+    
+    @param target:  Name of the module without file extension. 
+                    If the name ends with .mmp, the .mmp file is used for 
+                    defining the module.
+    @type target: str 
+    
+    @param targettype: Type of the program. One of L{arguments.TARGETTYPES}.    
+    @type targettype: str
+    
+    @param sources:     List of paths to sources to compiler
+    @type sources: list
+    
+    @param includes:    List of folders to be used for finding headers.
+    @type includes: list
+    @param definput:    Path to .def file containing frozen library entrypoints.
+    @type definput: str
+    
+    @param icons:       List of icon files to compile
+    @type icons: list
+    
+    @param resources:   List of paths to .rss files to compile. 
+                        See rssdefines param for giving CPP macros.
+    @type resources: list          
+    
+    @param libraries:   Used libraries.    
+    @type libraries: list
+    
+    @param capabilities:  Used capabilities. Default: FREE_CAPS
+    @type capabilities: list
+    
+    @param rssdefines:    Preprocessor definitions for resource compiler.
+    @type rssdefines: list
+    
+    @param package:       Path to installer file. If given, an installer is automatically created.
+                          The files are copied to L{arguments.PACKAGE_FOLDER} and
+                          Ensymble is used to create an installer package with simplesis command.
+
+    @type package: str
+                              
     @param extra_depends: External files which must be built prior the app
-    @param **kwargs: Keywords passed to C{create_environment()}
+    @type extra_depends: list
+     
+    @param kwargs: Additional keywords passed to selected compiler environment
+                   factory: L{gcce.create_environment}, L{winscw.create_environment}
+    
     @return: Last Command. For setting dependencies.
+    
     """
+    # Skip processing to speed up help message
     if HELP_ENABLED: return
     
     if target.lower().endswith( ".mmp" ):
@@ -210,7 +229,7 @@ def SymbianProgram( target, targettype = None,
     # Just give type of the file
     TARGET_RESULTABLE   = "%s/%s" % FOLDER_TARGET_TUPLE + "%s"
 
-    env = create_environment( target, targettype,
+    env = _create_environment( target, targettype,
                           includes,
                           libraries,
                           uid2, uid3,
@@ -435,9 +454,9 @@ def SymbianProgram( target, targettype = None,
            template = ""
            if targettype == TARGETTYPE_EXE:
                ## TODO: Set uid's
-               template = TARGET_UID_CPP_TEMPLATE_EXE % { "UID3": uid3 }
+               template = winscw.TARGET_UID_CPP_TEMPLATE_EXE % { "UID3": uid3 }
            else:
-               template = TARGET_UID_CPP_TEMPLATE_DLL
+               template = winscw.TARGET_UID_CPP_TEMPLATE_DLL
 
            f = open(uid_cpp_filename,'w');f.write( template );f.close()
            return None
@@ -613,6 +632,3 @@ def SymbianProgram( target, targettype = None,
         env.Depends( package, installed )
     
     return returned_command
-
-
-    

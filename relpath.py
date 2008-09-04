@@ -1,13 +1,16 @@
 #!/usr/bin/env python
-#
-# Author: Cimarron Taylor
-# Date: July 6, 2003
-# File Name: relpath.py
-# Program Description: Print relative path from /a/b/c/d to /a/b/c1/d1
 
-#
-# helper functions for relative paths
-#
+"""
+Helper functions for relative paths.
+Print relative path from /a/b/c/d to /a/b/c1/d1
+
+Author: Cimarron Taylor
+Date: July 6, 2003
+
+"""
+__author__ = "Cimarron Taylor"
+__date__   = "July 6, 2003"
+
 import os
 
 def pathsplit(path):

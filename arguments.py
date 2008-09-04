@@ -1,14 +1,18 @@
 """Reads and stores globals including the command line arguments"""
 
+__author__    = "Jussi Toivola"
+__license__   = "MIT License"
+
 import sys
 import os
 from os.path import join
 
 from SCons.Script import ARGUMENTS, Options, DefaultEnvironment, EnumOption, Variables, EnumVariable, Help
-VARS = Variables('arguments.py')
 
+VARS = Variables('arguments.py')
 def GetArg( name, help, default, allowed_values = None ):
     """Utility for adding help information and retrieving argument"""
+    
     if allowed_values is not None:
         VARS.Add( EnumVariable( name, help, default, 
                     allowed_values = allowed_values,
@@ -22,6 +26,13 @@ def GetArg( name, help, default, allowed_values = None ):
     
                 
 # Constants -------------------------------------------------------------------
+
+#: Easy constant for free caps
+FREE_CAPS = "NetworkServices LocalServices ReadUserData " \
+            "WriteUserData Location UserEnvironment PowerMgmt " \
+            "ProtServ SwEvent SurroundingsDD ReadDeviceData " \
+            "WriteDeviceData TrustedUI".split()
+            
 #: Symbian SDK folder
 EPOCROOT = os.environ["EPOCROOT"]
 
@@ -46,8 +57,8 @@ TARGETTYPES       = [ TARGETTYPE_DLL,
                       TARGETTYPE_PLUGIN,
                       TARGETTYPE_PYD ]
 
-#: Types, which are compiled not like exe.
-DLL_TARGETTYPES = [ TARGETTYPE_DLL, TARGETTYPE_PYD, TARGETTYPE_LIB ]
+#: Types, which are compiled like dll( outputs lib )
+DLL_TARGETTYPES = [ TARGETTYPE_PLUGIN, TARGETTYPE_DLL, TARGETTYPE_PYD, TARGETTYPE_LIB ]
 
 #: Maps targettype to correct uid1
 TARGETTYPE_UID_MAP = {
@@ -83,15 +94,19 @@ if sys.platform == "linux2":
     CSL_ARM_TOOLCHAIN_FOLDER_NAME = "csl-gcc/bin"
     
 #: Path to arm toolchain. Detected automatically from path using 'CSL Arm Toolchain' on Windows or csl-gcc on Linux
-PATH_ARM_TOOLCHAIN = [ _x for _x in _p.split( os.path.pathsep ) if CSL_ARM_TOOLCHAIN_FOLDER_NAME in _x ][0]
-
+PATH_ARM_TOOLCHAIN = [ _x for _x in _p.split( os.path.pathsep ) if CSL_ARM_TOOLCHAIN_FOLDER_NAME in _x ]
+if len( PATH_ARM_TOOLCHAIN) > 0:
+    PATH_ARM_TOOLCHAIN = PATH_ARM_TOOLCHAIN[0]
+else:
+    print "Warning: Unable to find '%s' from path. GCCE building will fail." % CSL_ARM_TOOLCHAIN_FOLDER_NAME
+        
 # Parse arguments -------------------------------------------------------------
 
 COMPILER   = GetArg( "compiler", "The compiler to use.", COMPILER_WINSCW, COMPILERS )
 
 RELEASE    = GetArg( "release", "Release type.", RELEASE_UDEB, RELEASETYPES )
 
-#: Location for the packages
+#: Location for the packages. Value generated in run-time.
 PACKAGE_FOLDER = join( "%s_%s" % ( COMPILER, RELEASE ), "packages" )
 
 
@@ -122,6 +137,7 @@ if COMPONENTS is not None:
 
 def __get_defines():
     "Ensure correct syntax for defined strings"
+    
     tmp = GetArg( "defines", "Extra preprocessor defines. For debugging, etc.", None )
     if tmp is None: return []
     tmp = tmp.split(",")
@@ -172,19 +188,20 @@ def get_output_folder(compiler, release, target, targettype ):
 
 # Generate help message
 def __generate_help_message():
+    # SCons gets into somekind of infinite loop if this file is imported directly
+    # as it is done with EpyDoc.        
     ENV = DefaultEnvironment(variables = VARS )
     msg = "SCons for Symbian arguments:"
     msg += "\n" + "=" *  len( msg )
     msg += VARS.GenerateHelpText(ENV).replace( "\n    a", " | a") 
     Help( msg )    
     
-__generate_help_message()
-
-#: Flag for disabling processing to shorten time to display help message
+#: Flag to disable processing to shorten time to display help message
 HELP_ENABLED = False    
-for x in [ "-h", "-H", "--help"]:
-    if x in sys.argv:
+for _x in [ "-h", "-H", "--help"]:
+    if _x in sys.argv:
         HELP_ENABLED = True
+        __generate_help_message()
         break    
 
 #if VARS.UnknownVariables():
@@ -194,3 +211,6 @@ for x in [ "-h", "-H", "--help"]:
 #   raise SystemExit()
    
    
+del _p
+del _x
+#del x
