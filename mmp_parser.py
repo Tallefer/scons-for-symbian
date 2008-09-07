@@ -39,7 +39,8 @@ class MMPParser:
         for x in KEYWORDS:
             result[x] = []
         result["epocallowdlldata"] = False # Not enabled with regular scripts either
-        
+        result["epocstacksize"].append( hex(8 * 1024 ) )
+        result["uid"] += [ None, None]
         for line in lines:                        
             parts = line.split()
             keyword = parts[0].lower()
@@ -72,8 +73,9 @@ class MMPParser:
                 result["resources"]   += [ join( sourcepath, parts[-1] ) ]
                 result["userinclude"] += [ sourcepath ]
         
+        # Take targettype from file extension instead. TODO: special dlls.
+        result["targettype"]    = result["target"][0].split(".")[-1]
         result["target"]        = ".".join( result["target"][0].split(".")[:-1] ) # Strip extension
-        result["targettype"]    = result["targettype"][0]
         result["epocstacksize"] = int( result["epocstacksize"][0], 16 )
         return result
 

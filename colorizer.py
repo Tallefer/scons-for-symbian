@@ -44,7 +44,7 @@ KEYWORD_ERRORS = [ x.lower() for x in [ "error:", " error ", "failed", " undefin
 KEYWORD_ERRORS_EXCLUDE = [ "error." ]
 
 #: Drawn with Colors.COMMENT
-KEYWORD_COMMENT  = [ x.lower() for x in [ "scons:", "note:", "copy("] ]
+KEYWORD_COMMENT  = [ x.lower() for x in [ "scons:", "note:", "copy(", "install file"] ]
 
 #: Excluded comments
 KEYWORD_COMMENT_EXCLUDE = []

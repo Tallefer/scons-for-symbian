@@ -66,7 +66,9 @@ TARGETTYPE_UID_MAP = {
     TARGETTYPE_EXE : "0x1000007a",
     TARGETTYPE_LIB : "",
 }
-   
+  
+
+
 # End Constants ---------------------------------------------------------------
    
 print "EPOCROOT=%s" % EPOCROOT
@@ -101,6 +103,8 @@ EPOC32_INCLUDE = join( EPOC32, 'include' )
 EPOC32_TOOLS   = join( EPOC32, 'tools' )
 #: Constant pointing to release folder
 EPOC32_RELEASE = join( EPOC32, "release", COMPILER, RELEASE )    
+#: Constant pointing to emulator c drive
+FOLDER_EMULATOR_C = join( EPOC32, "winscw", "c" )
 
 INCLUDES = [ EPOC32_INCLUDE,
              join( EPOC32_INCLUDE, "variant" )

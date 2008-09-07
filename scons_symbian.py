@@ -18,10 +18,10 @@ from arguments import *
 import winscw
 import gcce
 import colorizer
-
+    
 #: Handle to console for colorized output( and process launching )
 _OUTPUT_COLORIZER = colorizer.OutputConsole(  )
-    
+
 # Set EPOCROOT as default target, so the stuff will actually be built.
 Default( EPOCROOT )
     
@@ -44,8 +44,8 @@ def _create_environment( *args, **kwargs ):
         msg = "Error: Environment for '%s' is not implemented" % COMPILER
         raise NotImplemented( msg )
     return env
-
-def SymbianPackage( package, ensymbleargs = None, pkgfile=None):
+ 
+def SymbianPackage( package, ensymbleargs = None, pkgfile=None, extra_files = None ):
     """
     Create Symbian Installer( sis ) file. Can use either Ensymble or pkg file.
     To enable creation, give command line arg: dosis=true
@@ -58,22 +58,29 @@ def SymbianPackage( package, ensymbleargs = None, pkgfile=None):
     
     @param pkgfile: Path to pkg file.
     @type pkgfile: str
-    """  
+    @param extra_files: Copy files to package folder and install for simulator( to SIS with Ensymble only )
+    """                     
     # Skip processing to speed up help message                    
     if HELP_ENABLED: return
-    
+
     if ensymbleargs is not None and pkgfile is not None:
         raise ValueError( "Trying to use both Ensymble and PKG file. Which one do you really want?" )
     else:
         if ensymbleargs is None:
             ensymbleargs = {}
-        
+    
+    if extra_files is not None:
+        for target, source in extra_files:
+            Install( join( PACKAGE_FOLDER, package, target ), source )
+            if COMPILER == COMPILER_WINSCW:
+                Install( join( WINSCW_SIMULATOR_ROOT, target ),   source )
+            
     def create_install_file( installed ):
         "Utility for creating an installation package using Ensymble"
         from ensymble.cmd_simplesis import run as simplesis
         
         cmd = []
-
+        
         def ensymble( env, target = None, source = None ):
             """ Wrap ensymble simplesis command. """
             try:
@@ -83,14 +90,14 @@ def SymbianPackage( package, ensymbleargs = None, pkgfile=None):
                 return str(msg)
                                     
         if pkgfile is None and ENSYMBLE_AVAILABLE:
-                            
+             
             for x in ensymbleargs:
                 cmd += [ "%s=%s" % ( x, ensymbleargs[x] ) ]
             cmd += [ join( PACKAGE_FOLDER, package ), package ]
-                            
+            
             
             return Command( package, installed, ensymble, ENV = os.environ )
-                            
+        
         elif pkgfile is not None:
             cmd = "makesis %s %s" % ( pkgfile, package )
             return Command( package, installed + [pkgfile], cmd, ENV = os.environ )
@@ -98,22 +105,31 @@ def SymbianPackage( package, ensymbleargs = None, pkgfile=None):
  
     if DO_CREATE_SIS:
         return create_install_file( [] )
-        
+
+def SymbianHelp( *args  ):
+    
+    import cshlp
+    
+    helpresult = cshlp.CSHlp( *args )
+    return helpresult
+    
+    
 def SymbianProgram( target, targettype = None, 
                     sources = None, includes = None,
-                    libraries = None, uid2 = None, uid3 = "0x0",
+                    libraries = None, uid2 = None, uid3 = None,
                     definput = None, capabilities = None,
                     icons = None, resources = None,
                     rssdefines = None, 
+                    help = None,
                     # Sis stuff
-                    package  = "",
+                    package  = "",                 
                     extra_depends=[],                 
                     **kwargs ):
     """
     Main function for compiling Symbian software. Handles the whole process
     of source and resource compiling and SIS installer packaging. 
     
-    @param target:  Name of the module without file extension. 
+    @param target: Name of the module without file extension.
                     If the name ends with .mmp, the .mmp file is used for 
                     defining the module.
     @type target: str 
@@ -137,13 +153,13 @@ def SymbianProgram( target, targettype = None,
                         See rssdefines param for giving CPP macros.
     @type resources: list          
     
-    @param libraries:   Used libraries.    
+    @param libraries: Used libraries.
     @type libraries: list
     
-    @param capabilities:  Used capabilities. Default: FREE_CAPS
+    @param capabilities: Used capabilities. Default: FREE_CAPS
     @type capabilities: list
     
-    @param rssdefines:    Preprocessor definitions for resource compiler.
+    @param rssdefines: Preprocessor definitions for resource compiler.
     @type rssdefines: list
     
     @param package:       Path to installer file. If given, an installer is automatically created.
@@ -163,7 +179,7 @@ def SymbianProgram( target, targettype = None,
     """
     # Skip processing to speed up help message
     if HELP_ENABLED: return
-    
+
     if target.lower().endswith( ".mmp" ):
         import mmp_parser
         p = mmp_parser.MMPParser( target )
@@ -189,7 +205,15 @@ def SymbianProgram( target, targettype = None,
         kwargs["defines"]       = data["macro"][:]
         kwargs["allowdlldata"]  = data["epocallowdlldata"]
         kwargs["epocstacksize"] = data["epocstacksize"]
-   
+    
+    if includes is None:
+        includes = []
+    includes.extend( INCLUDES )
+    
+    if help:
+    # Adds the .hrh file to include path
+        includes.append( os.path.dirname( help ) )
+    
     if libraries is None:
         libraries = []
         
@@ -209,6 +233,8 @@ def SymbianProgram( target, targettype = None,
         else:
             uid2 = "0x0"
     
+    if uid3 is None:
+        uid3 = "0x0"
     
       
     # Is this Symbian component enabled?
@@ -241,8 +267,14 @@ def SymbianProgram( target, targettype = None,
                           **kwargs )
     env.BuildDir(OUTPUT_FOLDER, ".")
     
-    
-    
+    if help:
+        helpresult = SymbianHelp( env, help, uid3 )
+        if COMPILER == COMPILER_WINSCW:
+            env.Install( join( FOLDER_EMULATOR_C, "resource", "help" ), helpresult )
+        
+        env.Install( join( PACKAGE_FOLDER, "resource", "help" ), helpresult )
+        
+        
     #-------------------------------------------------------------- Create icons
     # Copy for emulator at the end using this list, just like binaries.
     #TODO: Create main interface SymbianIcon for generic icons
@@ -315,7 +347,7 @@ def SymbianProgram( target, targettype = None,
         converted_resources = []
         resource_headers = []
         import rcomp
-        
+
         if resources is not None:
             # Make the resources dependent on previous resource
             # Thus the resources must be listed in correct order.
@@ -324,12 +356,12 @@ def SymbianProgram( target, targettype = None,
             for rss_path in resources:
                 rss_notype = ".".join(os.path.basename(rss_path).split(".")[:-1]) # ignore rss
                 converted_rsg = join( OUTPUT_FOLDER, "%s.rsg" % rss_notype )
-                converted_rsc = join( OUTPUT_FOLDER, "%s.rsc" % rss_notype )                
+                converted_rsc = join( OUTPUT_FOLDER, "%s.rsc" % rss_notype )
                 converted_resources.append( converted_rsc )
-                                
-                result_paths = [ ]
+                
+                result_paths  = [ ]
                 copyres_cmds = [ ]
-                                
+
                 res_compile_command = rcomp.RComp( env, converted_rsc, converted_rsg,
                              rss_path,
                              "-m045,046,047",
@@ -538,7 +570,7 @@ def SymbianProgram( target, targettype = None,
 
         libfolder = "%EPOCROOT%epoc32/release/winscw/udeb/"
         libs      = [ libfolder + x for x in libraries]
-        
+
         for dep in extra_depends:
             env.Depends(build_prog, dep)
 

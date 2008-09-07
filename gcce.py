@@ -38,9 +38,9 @@ SYMBIAN_ARMV5_BASE_LIBRARIES =  [ SYMBIAN_ARMV5_LIBPATHLIB + x + ".lib" for x in
 SYMBIAN_ARMV5_BASE_LIBRARIES += [ SYMBIAN_ARMV5_LIBPATHDSO + x + ".dso" for x in [ "drtaeabi", "dfprvct2_2", "dfpaeabi", "scppnwdl" ,"drtrvct2_2" ] ]
 
 # LIBARGS must be AFTER the libraries or we get "undefined reference to `__gxx_personality_v0'" when linking
-WARNINGS =  "-Wall -Wno-ctor-dtor-privacy -Wno-unknown-pragmas -fexceptions " \
+WARNINGS_C =  "-Wall -Wno-unknown-pragmas -fexceptions " \
             "-march=armv5t -mapcs -pipe -nostdinc -msoft-float"
-
+WARNINGS_CXX = WARNINGS_C + " -Wno-ctor-dtor-privacy"
             
 # These are enabled from FP1 onwards on regular scripts. Reduces size of the binaries.
 GCCE_OPTIMIZATION_FLAGS = "-O2 -fno-unit-at-a-time"
@@ -210,10 +210,10 @@ def create_environment( target,
                     
                     # Compiler settings
                     CC  = r'arm-none-symbianelf-g++',
-                    CFLAGS = WARNINGS +  " -x c -include " + COMPILER_INCLUDE,
+                    CFLAGS = WARNINGS_C +  " -x c -include " + COMPILER_INCLUDE,
                     
                     CXX = r'arm-none-symbianelf-g++',
-                    CXXFLAGS = WARNINGS + " " + GCCE_OPTIMIZATION_FLAGS + " -x c++ -include " + COMPILER_INCLUDE,
+                    CXXFLAGS = WARNINGS_CXX + " " + GCCE_OPTIMIZATION_FLAGS + " -x c++ -include " + COMPILER_INCLUDE,
                     CPPPATH = INCLUDES + includes,
                     CPPDEFINES = defines,
                     INCPREFIX = "-I ",

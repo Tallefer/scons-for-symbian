@@ -1,0 +1,6 @@
+#!/usr/env/bin python
+
+# MMP import example
+from scons_symbian import *
+
+SymbianProgram( join( 'group', 'helloworldbasic.mmp' ) )
