@@ -34,17 +34,18 @@ __EMULATOR_IMAGE_HEADER2(0x1000007a,0x100039ce,%(UID3)s,EPriorityForeground,0x00
 #pragma data_seg()
 """
                         
-def create_environment(  target,
-                                    targettype,
-                                    includes,
-                                    libraries,
-                                    uid2,
-                                    uid3,
-                                    definput = None,
-                                    capabilities = None,
-                                    defines = None, 
-                                    **kwargs  
-                                    ):
+def create_environment( target,
+                        targettype,
+                        includes,
+                        sysincludes,
+                        libraries,
+                        uid2,
+                        uid3,
+                        definput = None,
+                        capabilities = None,
+                        defines = None, 
+                        **kwargs  
+                        ):
     """Create WINSCW environment
     @param kwargs: ignored keyword arguments.
     @see: L{scons_symbian.SymbianProgram}
@@ -61,8 +62,6 @@ def create_environment(  target,
     LIBPATH   = SYMBIAN_WINSCW_LIBPATHLIB
     LIBRARIES = [ os.path.normpath(LIBPATH + x ).lower() for x in libraries ]    
     
-    if defines is None:
-        defines = []
     defines.extend( DEFAULT_WINSCW_DEFINES )
     defines.extend( CMD_LINE_DEFINES )
 
@@ -113,6 +112,12 @@ def create_environment(  target,
 
 
     COMPILER_INCLUDE = os.path.normpath( EPOCROOT + "/epoc32/include/gcce/gcce.h" )
+    
+    platform_header = os.path.basename( PLATFORM_HEADER )
+    if len( sysincludes ) > 0:
+        sysincludes = "-I" + " -I".join( sysincludes )
+    else:
+        sysincludes = " "
         
     env = Environment( 
                     tools = ["mingw"], # Disable searching of tools
@@ -127,10 +132,10 @@ def create_environment(  target,
                    CXX = r'mwccsym2',
                    #CCCOMFLAGS= '$CPPFLAGS $_CPPDEFFLAGS $_CPPINCFLAGS -o $TARGET $SOURCES',
                    #CCFLAGS = WINSCW_CC_FLAGS,#'-O2',
-                   CPPPATH = INCLUDES + includes,
+                   CPPPATH =  includes,
                    CPPDEFINES = defines,
                    #CXXFLAGS   = WINSCW_CC_FLAGS + ' -cwd source -i- -include "Symbian_OS_v9.1.hrh"',
-                   CCFLAGS     = WINSCW_CC_FLAGS + ' -cwd source -i- -include "%s"' % os.path.basename( PLATFORM_HEADER ),
+                   CCFLAGS     = WINSCW_CC_FLAGS + ' -cwd source -I- %s -include "%s"' % ( sysincludes, platform_header ),
                    INCPREFIX  = "-i ",
                    CPPDEFPREFIX = "-d ",
                    # Linker settings

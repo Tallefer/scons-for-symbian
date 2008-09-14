@@ -30,7 +30,9 @@ def CSHlp( env, source, uid ):
     
     new_source   = join( dirname( source ) , "_" + basename( source ) )
     source_noext = ".".join( source.split(".")[:-1] )
-    result       = "%s_%s.hlp" % ( source_noext, uid )
+    # Adding underscore before .hlp, because on GCCE, colon forces space on preprocessor concatenation
+    # and it seems to be impossible to generate the header filename if token starts with colon.( See LogMan project )
+    result       = "%s_%s_.hlp" % ( source_noext, uid )
     result_hrh   = result + ".hrh"
     
     data = replace_tag( data, "helpfileUID", uid )
@@ -42,7 +44,7 @@ def CSHlp( env, source, uid ):
     
     env.Command( [ result, result_hrh ], source, cmd )
     
-    return result
+    return [ result, result_hrh ]
         
         
 if __name__ == "__main__":

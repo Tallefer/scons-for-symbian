@@ -48,6 +48,7 @@ GCCE_OPTIMIZATION_FLAGS = "-O2 -fno-unit-at-a-time"
 def create_environment( target,
                         targettype,
                         includes,
+                        sysincludes,
                         libraries,
                         uid2,
                         uid3,
@@ -67,9 +68,6 @@ def create_environment( target,
     @param kwargs: ignored keyword arguments.
     @see: L{scons_symbian.SymbianProgram}
     """
-
-    if defines is None:
-        defines = []
     
     if targettype in DLL_TARGETTYPES:
         defines.append( "__DLL__" )
@@ -78,7 +76,6 @@ def create_environment( target,
         
     defines.extend( DEFAULT_GCCE_DEFINES )
     defines.extend( CMD_LINE_DEFINES )
-    
 
     LIBARGS   = [ "-lsupc++", "-lgcc" ]
     LIBPATH   = SYMBIAN_ARMV5_LIBPATHDSO
@@ -200,6 +197,11 @@ def create_environment( target,
         
         uid1 = TARGETTYPE_UID_MAP[TARGETTYPE_DLL]#"0x10000079" # DLL
     
+    #if len( sysincludes ) > 0:
+    #    sysincludes = "-I " + " -I ".join( sysincludes )
+    #else:
+    #    sysincludes = " "
+        
     env = Environment (
                     tools = ["mingw"], # Disable searching of tools
                     ENV = os.environ,
@@ -213,8 +215,10 @@ def create_environment( target,
                     CFLAGS = WARNINGS_C +  " -x c -include " + COMPILER_INCLUDE,
                     
                     CXX = r'arm-none-symbianelf-g++',
-                    CXXFLAGS = WARNINGS_CXX + " " + GCCE_OPTIMIZATION_FLAGS + " -x c++ -include " + COMPILER_INCLUDE,
-                    CPPPATH = INCLUDES + includes,
+                    CXXFLAGS = WARNINGS_CXX + " " + GCCE_OPTIMIZATION_FLAGS + " -x c++ -include %s " % ( COMPILER_INCLUDE ),
+                    
+                    # isystem does not work so just adding the system include paths before normal includes.
+                    CPPPATH = sysincludes + includes,
                     CPPDEFINES = defines,
                     INCPREFIX = "-I ",
                     

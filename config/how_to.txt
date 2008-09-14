@@ -1,0 +1,7 @@
+To override the values in defaults.py
+
+Create folder <your login name>.py in lowercase
+
+For example, if your loginname is JOHN_DOE create 'john_doe'
+
+Create config.py there and off you go.

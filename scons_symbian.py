@@ -115,12 +115,14 @@ def SymbianHelp( *args  ):
     
     
 def SymbianProgram( target, targettype = None, 
-                    sources = None, includes = None,
+                    sources = None, includes = None, 
                     libraries = None, uid2 = None, uid3 = None,
                     definput = None, capabilities = None,
                     icons = None, resources = None,
                     rssdefines = None, 
+                    defines    = None,
                     help = None,
+                    sysincludes = None,
                     # Sis stuff
                     package  = "",                 
                     extra_depends=[],                 
@@ -140,8 +142,11 @@ def SymbianProgram( target, targettype = None,
     @param sources:     List of paths to sources to compiler
     @type sources: list
     
-    @param includes:    List of folders to be used for finding headers.
+    @param includes:    List of folders to be used for finding user headers.
     @type includes: list
+    
+    @param sysincludes:  List of folders to be used for finding system headers.
+    @type sysincludes: list
     
     @param definput:    Path to .def file containing frozen library entrypoints.
     @type definput: str
@@ -158,6 +163,9 @@ def SymbianProgram( target, targettype = None,
     
     @param capabilities: Used capabilities. Default: FREE_CAPS
     @type capabilities: list
+    
+    @param defines: Preprocess definitions.
+    @type defines: list
     
     @param rssdefines: Preprocessor definitions for resource compiler.
     @type rssdefines: list
@@ -208,7 +216,15 @@ def SymbianProgram( target, targettype = None,
     
     if includes is None:
         includes = []
-    includes.extend( INCLUDES )
+    
+    if defines is None:
+        defines = []
+    defines = defines[:]
+    
+    if sysincludes is None:
+        sysincludes = []
+        
+    sysincludes.extend( SYSTEM_INCLUDES )
     
     if help:
     # Adds the .hrh file to include path
@@ -222,10 +238,6 @@ def SymbianProgram( target, targettype = None,
     
     if capabilities is None:
         capabilities = FREE_CAPS
-        
-    if rssdefines is None:
-        rssdefines = []
-    rssdefines.append( r'LANGUAGE_SC' ) 
     
     if uid2 is None:
         if targettype == TARGETTYPE_EXE:
@@ -236,7 +248,17 @@ def SymbianProgram( target, targettype = None,
     if uid3 is None:
         uid3 = "0x0"
     
-      
+    # Add macros to ease changing application UID
+    uiddefines = [
+        "__UID3__=%s" % uid3
+    ]
+    defines.extend( uiddefines )
+    
+    if rssdefines is None:
+        rssdefines = []
+    rssdefines.append( r'LANGUAGE_SC' ) 
+    rssdefines.extend( uiddefines )
+    
     # Is this Symbian component enabled?
     component_name = ".".join( [ target, targettype] ).lower()
     
@@ -260,21 +282,25 @@ def SymbianProgram( target, targettype = None,
 
     env = _create_environment( target, targettype,
                           includes,
+                          sysincludes,
                           libraries,
                           uid2, uid3,
                           definput = definput,
                           capabilities = capabilities,
+                          defines = defines,
                           **kwargs )
-    env.BuildDir(OUTPUT_FOLDER, ".")
+    
+    # Don't duplicate to ease use of IDE(Carbide)
+    env.BuildDir(OUTPUT_FOLDER, ".", duplicate=0 )
     
     if help:
         helpresult = SymbianHelp( env, help, uid3 )
         if COMPILER == COMPILER_WINSCW:
-            env.Install( join( FOLDER_EMULATOR_C, "resource", "help" ), helpresult )
+            env.Install( join( FOLDER_EMULATOR_C, "resource", "help" ), helpresult[0] )
         
-        env.Install( join( PACKAGE_FOLDER, "resource", "help" ), helpresult )
-        
-        
+        env.Install( join( PACKAGE_FOLDER, "resource", "help" ), helpresult[0] )
+        extra_depends.extend( helpresult )
+
     #-------------------------------------------------------------- Create icons
     # Copy for emulator at the end using this list, just like binaries.
     #TODO: Create main interface SymbianIcon for generic icons
@@ -365,11 +391,11 @@ def SymbianProgram( target, targettype = None,
                 res_compile_command = rcomp.RComp( env, converted_rsc, converted_rsg,
                              rss_path,
                              "-m045,046,047",
-                             includes + INCLUDES,
+                             sysincludes + includes,
                              [PLATFORM_HEADER],
                              rssdefines )
                              
-                env.Depends(res_compile_command, converted_icons)
+                env.Depends(res_compile_command, converted_icons )
 
                 includefolder = EPOC32_INCLUDE
                 
@@ -455,8 +481,9 @@ def SymbianProgram( target, targettype = None,
             # Depend on the libs
             for libname in libraries:
                 env.Depends( build_prog, libname )
-                
+            
             env.Depends( build_prog, converted_icons )
+            env.Depends( build_prog, converted_resources )
             env.Depends( build_prog, resource_headers )
 
             # Mark the lib as a resultable also
@@ -521,8 +548,10 @@ def SymbianProgram( target, targettype = None,
             # Depends on the used libraries. This has a nice effect since if,
             # this project depends on one of the other projects/components/dlls/libs
             # the depended project is automatically built first.
+            
             env.Depends( build_prog, [ join( EPOC32_RELEASE, libname ) for libname in libraries] )
             env.Depends( build_prog, converted_icons )
+            env.Depends( build_prog, converted_resources )
             env.Depends( build_prog, resource_headers )
         else:
             build_prog = env.StaticLibrary( TARGET_RESULTABLE % ".lib" , sources )
@@ -557,7 +586,7 @@ def SymbianProgram( target, targettype = None,
         # NOTE: If build folder is changed this does not work anymore.
         # List compiled sources and add to dependency list
         object_paths = [ ".".join( x.split(".")[:-1] ) + ".o" for x in sources ]
-
+        
         # Sources depend on the headers generated from .rss files.
         env.Depends( object_paths, resource_headers )
 
@@ -573,7 +602,8 @@ def SymbianProgram( target, targettype = None,
 
         for dep in extra_depends:
             env.Depends(build_prog, dep)
-
+            env.Depends(object_paths, dep)
+            
         if targettype in DLL_TARGETTYPES and targettype != TARGETTYPE_LIB:
 
             env.Command( TARGET_RESULTABLE % ("." + targettype ), [ temp_dll_path, TARGET_RESULTABLE % ".def" ],

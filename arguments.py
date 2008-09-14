@@ -7,6 +7,8 @@ import sys
 import os
 from os.path import join
 
+from config import *
+
 from SCons.Script import ARGUMENTS, Options, DefaultEnvironment, EnumOption, Variables, EnumVariable, Help
 
 VARS = Variables('arguments.py')
@@ -23,55 +25,27 @@ def GetArg( name, help, default, allowed_values = None ):
     if value is not None:
         value = value.lower()
     return value
-    
-                
-# Constants -------------------------------------------------------------------
 
-#: Easy constant for free caps
-FREE_CAPS = "NetworkServices LocalServices ReadUserData " \
-            "WriteUserData Location UserEnvironment PowerMgmt " \
-            "ProtServ SwEvent SurroundingsDD ReadDeviceData " \
-            "WriteDeviceData TrustedUI".split()
-            
 #: Symbian SDK folder
-EPOCROOT = os.environ["EPOCROOT"]
-
-COMPILER_WINSCW = "winscw"
-COMPILER_GCCE   = "gcce"
-COMPILERS = [COMPILER_WINSCW, COMPILER_GCCE ]
-
-RELEASE_UREL    = "urel"
-RELEASE_UDEB    = "udeb"
-RELEASETYPES    =  [ RELEASE_UDEB, RELEASE_UREL ]
-
-TARGETTYPE_DLL    = "dll"
-TARGETTYPE_EXE    = "exe"
-TARGETTYPE_LIB    = "lib"
-TARGETTYPE_PLUGIN = "plugin"
-TARGETTYPE_PYD    = "pyd"
-    
-#: List of possible targettypes
-TARGETTYPES       = [ TARGETTYPE_DLL,
-                      TARGETTYPE_EXE,
-                      TARGETTYPE_LIB,
-                      TARGETTYPE_PLUGIN,
-                      TARGETTYPE_PYD ]
-
-#: Types, which are compiled like dll( outputs lib )
-DLL_TARGETTYPES = [ TARGETTYPE_PLUGIN, TARGETTYPE_DLL, TARGETTYPE_PYD, TARGETTYPE_LIB ]
-
-#: Maps targettype to correct uid1
-TARGETTYPE_UID_MAP = {
-    TARGETTYPE_DLL : "0x10000079",
-    TARGETTYPE_EXE : "0x1000007a",
-    TARGETTYPE_LIB : "",
-}
-  
-
-
-# End Constants ---------------------------------------------------------------
-   
+EPOCROOT = os.environ.get( "EPOCROOT", EPOCROOT )   
 print "EPOCROOT=%s" % EPOCROOT
+
+#: Constant pointing to EPOCROOT/epoc32
+EPOC32         = join( EPOCROOT, 'epoc32' )
+#: Constant pointing to system include folder
+EPOC32_INCLUDE = join( EPOC32, 'include' )
+#: Constant pointing to system tools folder
+EPOC32_TOOLS   = join( EPOC32, 'tools' )
+#: Constant pointing to release folder
+EPOC32_RELEASE = join( EPOC32, "release", COMPILER, RELEASE )    
+#: Constant pointing to emulator c drive
+FOLDER_EMULATOR_C = join( EPOC32, "winscw", "c" )
+
+#: Default include folders
+SYSTEM_INCLUDES = [ EPOC32_INCLUDE,
+                    join( EPOC32_INCLUDE, "variant" )
+                ]
+           
 if sys.platform == "win32":
     os.environ["EPOCROOT"] = EPOCROOT.replace("/", "\\")
 else:
@@ -91,31 +65,16 @@ else:
         
 # Parse arguments -------------------------------------------------------------
 
-COMPILER   = GetArg( "compiler", "The compiler to use.", COMPILER_WINSCW, COMPILERS )
+#: Used compiler
+COMPILER   = GetArg( "compiler", "The compiler to use.", COMPILER, COMPILERS )
 
-RELEASE    = GetArg( "release", "Release type.", RELEASE_UDEB, RELEASETYPES )
-
-#: Constant pointing to EPOCROOT/epoc32
-EPOC32         = join( EPOCROOT, 'epoc32' )
-#: Constant pointing to system include folder
-EPOC32_INCLUDE = join( EPOC32, 'include' )
-#: Constant pointing to system tools folder
-EPOC32_TOOLS   = join( EPOC32, 'tools' )
-#: Constant pointing to release folder
-EPOC32_RELEASE = join( EPOC32, "release", COMPILER, RELEASE )    
-#: Constant pointing to emulator c drive
-FOLDER_EMULATOR_C = join( EPOC32, "winscw", "c" )
-
-INCLUDES = [ EPOC32_INCLUDE,
-             join( EPOC32_INCLUDE, "variant" )
-           ]
-
+#: Release type
+RELEASE    = GetArg( "release", "Release type.", RELEASE, RELEASETYPES )
 
 #: Location for the packages. Value generated in run-time.
 PACKAGE_FOLDER = join( "%s_%s" % ( COMPILER, RELEASE ), "packages" )
 
-
-DO_CREATE_SIS = GetArg( "dosis", "Create SIS package.", "false", [ "true", "false"] ) 
+DO_CREATE_SIS = GetArg( "dosis", "Create SIS package.", str(DO_CREATE_SIS).lower(), [ "true", "false"] ) 
 DO_CREATE_SIS = DO_CREATE_SIS == "true" 
 
 ENSYMBLE_AVAILABLE = False
@@ -132,24 +91,12 @@ if COMPILER == COMPILER_WINSCW:
 if not DO_CREATE_SIS:
     print "Info: SIS creation disabled"
 
-
-#: Constant for S60 UI platform
-UI_PLATFORM_S60 = "S60"
-#: Constant for UIQ UI platform
-UI_PLATFORM_UIQ = "UIQ"
-#: List of possible UI platforms
-UI_PLATFORMS    = [UI_PLATFORM_S60, UI_PLATFORM_UIQ]
-#: Constant for current UI platform
-#: One of UI_PLATFORMS
-UI_PLATFORM = ""
-
 #: Constant for ui platform version
 UI_VERSION  = (3,0)
 
 #: SDK platform header( generated )
 #: S60 3rd & mr = EPOC32_INCLUDE + variant + symbian_os_v9.1.hrh
 PLATFORM_HEADER = join( EPOC32_INCLUDE, "variant" )
-
 
 def _resolve_platform():    
     """Find out current SDK version"""
@@ -205,10 +152,21 @@ print "Info: UI platform        = %s"    % UI_PLATFORM, "%d.%d" % UI_VERSION
 #: Built components. One SConstruct can define multiple SymbianPrograms.
 #: This can be used from command-line to build only certain SymbianPrograms
 COMPONENTS = GetArg( "components", "Components to build. Separate with ','.", "all" )
-COMPONENTS = ( None if COMPONENTS == "all" else COMPONENTS )  
+COMPONENTS_EXCLUDE = False
 
-if COMPONENTS is not None:
-    COMPONENTS = COMPONENTS.lower().split(",")
+def __processComponents( ):
+    components = COMPONENTS.lower().split(",")
+    if "all" in components:
+        
+        if len( components ) == 1: # if all only
+            return None
+        
+        COMPONENTS_EXCLUDE = True
+        components.remove( "all" )
+    
+    return components
+
+COMPONENTS = __processComponents()
 
 def __get_defines():
     "Ensure correct syntax for defined strings"
