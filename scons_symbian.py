@@ -135,7 +135,7 @@ def ToPackage( env, package_drive_map, package, target, source ):
                 regexp = re.compile( regexp )
                 package_drive_map[d] = regexp
             
-            if p.match( filename ):
+            if regexp.match( filename ):
                 drive = d
                 break
                 
