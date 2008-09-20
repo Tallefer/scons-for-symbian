@@ -113,6 +113,33 @@ def SymbianHelp( *args  ):
     helpresult = cshlp.CSHlp( *args )
     return helpresult
     
+
+def ToPackage( env, package_drive_map, package, target, source ):
+    
+    if package is None:
+        return
+        
+    import re
+    
+    # WARNING: Copying to any/c/e is custom Ensymble feature.
+    drive = ""
+    
+    if package_drive_map is not None:
+        # Goes to any by default
+        drive = "any"    
+        filename = os.path.basename( source )
+        
+        for d in package_drive_map:
+            regexp = package_drive_map[d]       
+            if type(regexp) == str: 
+                regexp = re.compile( regexp )
+                package_drive_map[d] = regexp
+            
+            if p.match( filename ):
+                drive = d
+                break
+                
+    return env.Install( join( PACKAGE_FOLDER, package, drive, target ), source )                      
     
 def SymbianProgram( target, targettype = None, 
                     sources = None, includes = None, 
@@ -124,7 +151,8 @@ def SymbianProgram( target, targettype = None,
                     help = None,
                     sysincludes = None,
                     # Sis stuff
-                    package  = "",                 
+                    package  = "",
+                    package_drive_map = None,                 
                     extra_depends=[],                 
                     **kwargs ):
     """
@@ -175,7 +203,17 @@ def SymbianProgram( target, targettype = None,
                           Ensymble is used to create an installer package with simplesis command.
 
     @type package: str
+    
+    @param package_drive_map: For custom Ensymble with drive destination support.
+                              Map files to drives by using regular expressions.
+                              For example, to map .mif and .rsc files to C drive:
+                                package_drive_map = { "C" : ".*[.](mif|rsc)" }
+                              The files goes to 'any' folder by default.
                               
+                              Disabled if None. Normal Ensymble behavior used.
+                                
+    @type  package_drive_map: dict
+                                  
     @param extra_depends: External files which must be built prior the app
     @type extra_depends: list
      
@@ -271,7 +309,7 @@ def SymbianProgram( target, targettype = None,
 
     OUTPUT_FOLDER  = get_output_folder(COMPILER,RELEASE, target, targettype )
     
-    sources = [ OUTPUT_FOLDER + "/" + x for x in sources ]
+    sources = [ join( OUTPUT_FOLDER, x) for x in sources ]
     
     # This is often needed
     FOLDER_TARGET_TUPLE = ( OUTPUT_FOLDER, target )    
@@ -279,7 +317,8 @@ def SymbianProgram( target, targettype = None,
     
     # Just give type of the file
     TARGET_RESULTABLE   = "%s/%s" % FOLDER_TARGET_TUPLE + "%s"
-
+    
+    
     env = _create_environment( target, targettype,
                           includes,
                           sysincludes,
@@ -298,7 +337,10 @@ def SymbianProgram( target, targettype = None,
         if COMPILER == COMPILER_WINSCW:
             env.Install( join( FOLDER_EMULATOR_C, "resource", "help" ), helpresult[0] )
         
-        env.Install( join( PACKAGE_FOLDER, "resource", "help" ), helpresult[0] )
+        ToPackage( env, package_drive_map, package, 
+                    join( "resource", "help" ), 
+                    helpresult[0] )
+        #
         extra_depends.extend( helpresult )
 
     #-------------------------------------------------------------- Create icons
@@ -313,7 +355,7 @@ def SymbianProgram( target, targettype = None,
             sdk_data_resource = EPOCROOT + r"epoc32/DATA/Z/resource/apps/%s"
             sdk_resource = join( EPOCROOT + r"epoc32", "release", COMPILER,
                              RELEASE, "z",  "resource", "apps", "%s" )
-            package_resource = join( PACKAGE_FOLDER, package, "resource", "apps")
+            #package_resource = join( "resource", "apps")
             #if not os.path.exists(result_install): os.makedirs(result_install)
             #result_install += "%s"
 
@@ -341,13 +383,17 @@ def SymbianProgram( target, targettype = None,
                 copyres_cmds.append( Copy( sdk_target, tmp ) )
                 sdk_icons.append( sdk_target )
                 
-                package_target = join( package_resource, iconfilename )
-                copyres_cmds.append( Copy( package_target, tmp ) )
-                sdk_icons.append( package_target )
+                #package_target = join( package_resource, iconfilename )
+                #copyres_cmds.append( Copy( package_target, tmp ) )
+                #sdk_icons.append( package_target )
                 
+                ToPackage( env, package_drive_map, package, 
+                    join( "resource", "apps"), 
+                    tmp )
+                    
                 # Dependency
-                if package != "":  
-                    env.Depends( package, package_target )
+                #if package != "":  
+                #    env.Depends( package, package_target )
                 
             return env.Command( sdk_icons, icon_targets, copyres_cmds )
 
@@ -399,7 +445,7 @@ def SymbianProgram( target, targettype = None,
 
                 includefolder = EPOC32_INCLUDE
                 
-                installfolder = [ PACKAGE_FOLDER ]
+                installfolder = []
                 if package != "": 
                     installfolder.append( package )
                 if rss_notype.endswith( "_reg" ):
@@ -407,10 +453,7 @@ def SymbianProgram( target, targettype = None,
                 else:
                     installfolder.append( join( "resource", "apps" ) )
                 installfolder = os.path.join( *installfolder )
-                 
-                if not os.path.exists(installfolder): 
-                    os.makedirs(installfolder)
-
+                
                 # Copy files for sis creation and for simulator
                 def copy_file( source_path, target_path ):
                     copy_cmd = Copy( target_path, source_path )
@@ -419,9 +462,10 @@ def SymbianProgram( target, targettype = None,
                     result_paths.append( target_path )
 
                 rsc_filename = "%s.%s" % ( rss_notype, "rsc" )
-                installfolder += "/" + rsc_filename
-                # Copy to sis creation folder
-                copy_file( converted_rsc, installfolder )
+                # Copy to sis creation folder                
+                ToPackage( env, package_drive_map, package, 
+                    join( "resource", "apps"), 
+                    converted_rsc )
 
                 # Copy to /epoc32/include/
                 includepath = join( includefolder, "%s.%s" % ( rss_notype, "rsg" ) )
@@ -450,7 +494,6 @@ def SymbianProgram( target, targettype = None,
 
                 # Depend on previous. TODO: Use SCons Preprocessor scanner.
                 if prev_resource is not None:
-                    #print converted_rsg, includepath
                     env.Depends( rss_path, prev_resource )
                 prev_resource = includepath
                 
@@ -573,15 +616,12 @@ def SymbianProgram( target, targettype = None,
                 r'perl -S %EPOCROOT%epoc32/tools/makedef.pl -absent __E32Dll ' + '-Inffile "%s" ' % ( TARGET_RESULTABLE % ".inf" )
                 + definput
                 + ' "%s"' % ( TARGET_RESULTABLE % '.def' ) ] )
-            #print action
-            #BuildDir('build', 'src', duplicate=0)
+
             defbld = Builder( action = action,
                               ENV = os.environ )
             env.Append( BUILDERS = {'Def' : defbld} )
-            env.Def( #COMPILER+ "/" + target + ".inf",
-                       #TARGET_RESULTABLE % ".inf",
-                       TARGET_RESULTABLE % ".def",
-                       TARGET_RESULTABLE % "._tmp_lib" )
+            env.Def( TARGET_RESULTABLE % ".def",
+                     TARGET_RESULTABLE % "._tmp_lib" )
 
         # NOTE: If build folder is changed this does not work anymore.
         # List compiled sources and add to dependency list
@@ -599,11 +639,7 @@ def SymbianProgram( target, targettype = None,
 
         libfolder = "%EPOCROOT%epoc32/release/winscw/udeb/"
         libs      = [ libfolder + x for x in libraries]
-
-        for dep in extra_depends:
-            env.Depends(build_prog, dep)
-            env.Depends(object_paths, dep)
-            
+    
         if targettype in DLL_TARGETTYPES and targettype != TARGETTYPE_LIB:
 
             env.Command( TARGET_RESULTABLE % ("." + targettype ), [ temp_dll_path, TARGET_RESULTABLE % ".def" ],
@@ -641,16 +677,19 @@ def SymbianProgram( target, targettype = None,
                         )
                 ]
             )
-
+    
+    for dep in extra_depends:
+        env.Depends(sources, dep)
+        env.Depends(build_prog, dep)
+        #env.Depends(object_paths, dep)
+        
     def copy_result_binary( ):
         """Copy the linked binary( exe, dll ) for emulator
         and to resultables folder.
         """
-        installfolder = [ PACKAGE_FOLDER ]
+        installfolder = [ ]
         
-        if targettype != TARGETTYPE_LIB:
-            if package != "":  # Install the files for sis packaging.
-                installfolder.append( package )
+        if targettype != TARGETTYPE_LIB:            
             installfolder += ["sys", "bin" ]
         else: # Don't install libs to device.
             installfolder += ["lib"]
@@ -683,6 +722,15 @@ def SymbianProgram( target, targettype = None,
         installed.append(installpath )
         returned_command = env.Command( installed , copysource, postcommands )
         
+        if targettype != TARGETTYPE_LIB:
+            ToPackage( env, package_drive_map, package, 
+                    installfolder, 
+                    copysource )
+        else:  # Don't install libs to device.
+            ToPackage( env, None, None, 
+                    "lib", 
+                    copysource )
+                    
         return installed
     
     installed = copy_result_binary()
