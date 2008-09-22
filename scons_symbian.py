@@ -5,7 +5,7 @@ __license__   = "MIT License"
 import os
 import sys
 import textwrap
-from os.path import join
+from os.path import join, basename
 
 from SCons.Environment import Environment
 from SCons.Builder     import Builder
@@ -44,14 +44,21 @@ def _create_environment( *args, **kwargs ):
         msg = "Error: Environment for '%s' is not implemented" % COMPILER
         raise NotImplemented( msg )
     return env
- 
-def SymbianPackage( package, ensymbleargs = None, pkgfile=None, extra_files = None ):
+
+def pkgname( sisname ):
+    "Convert sisname to pkg filename"
+    return ".".join( sisname.split(".")[:-1] + ["pkg"] )
+    
+def SymbianPackage( package, ensymbleargs = None, pkgargs = None, pkgfile=None, extra_files = None ):
     """
     Create Symbian Installer( sis ) file. Can use either Ensymble or pkg file.
     To enable creation, give command line arg: dosis=true
     
     @param package: Name of the package.
     @type package: str
+    
+    @param pkgargs: Arguments to PKG generation. Disabled if none, use empty dict for simple enable
+    @type pkgargs: dict
     
     @param ensymbleargs: Arguments to Ensymble simplesis.
     @type ensymbleargs: dict 
@@ -70,11 +77,67 @@ def SymbianPackage( package, ensymbleargs = None, pkgfile=None, extra_files = No
             ensymbleargs = {}
     
     if extra_files is not None:
+        pkg = PKG_DATA.get( package, {} )
+        
         for target, source in extra_files:
+            pkg[source] = target
+            
             Install( join( PACKAGE_FOLDER, package, target ), source )
             if COMPILER == COMPILER_WINSCW:
                 Install( join( WINSCW_SIMULATOR_ROOT, target ),   source )
+        
+        PKG_DATA[package] = pkg
+        
+    def create_pkg_file( pkgargs ):
+        
+        if pkgargs is None:
+            pkgargs = {}
             
+        def cmd( env, target = None, source = None ):
+            
+            print "Creating pkg", target[0]
+            
+            pkgfile = str(target[0])
+            f=open( pkgfile, 'w');
+            version = pkgargs.get("version", ( "1","0","00000" ) )
+            
+            files = PKG_DATA[package]
+            
+            header = '#{"%(appname)s"},(%(uid)s),' % ( pkgargs )
+            header += '%s,%s,%s' % tuple(version)
+            header += ',TYPE=%s\n\n' % pkgargs.get( "type", "SISSYSTEM" )
+            
+            f.write( ";Localised package name\n")
+            f.write( header )
+            
+            f.write( ";Localized vendor name\n")
+            f.write( '%%{"%s"}\n\n' % pkgargs.get( "vendor", "VENDOR" ) )
+            
+            f.write( ';Unique Vendor name\n' )
+            f.write( ':"%s"\n\n' % pkgargs.get( "vendor_id", "VENDOR" ) )
+            
+            ## TODO: Correct UID for UIQ    
+            f.write( '[0x101F7961], 0, 0, 0, {"Series60ProductID"}\n\n' )
+            keys = files.keys();keys.sort()
+            for x in keys:
+                t = files[x]
+                t = t.split("\\")
+                if t[0] == "any":
+                    t[0] = "!:"
+                else:
+                    t[0] = t[0]+":"
+                t = "\\".join( t ).replace("/","\\")
+                x = x.replace("/", "\\")
+                f.write( '%-50s - "%s"\n' % ( '"%s"' % x, t ) )
+            
+            f.close()
+        
+        Depends( package, pkgname( package ) )
+        return Command( pkgname( package ), None, cmd, ENV = os.environ )
+    
+    if pkgargs is not None and COMPILER != COMPILER_WINSCW:    
+        create_pkg_file( pkgargs )
+    
     def create_install_file( installed ):
         "Utility for creating an installation package using Ensymble"
         from ensymble.cmd_simplesis import run as simplesis
@@ -93,8 +156,8 @@ def SymbianPackage( package, ensymbleargs = None, pkgfile=None, extra_files = No
              
             for x in ensymbleargs:
                 cmd += [ "%s=%s" % ( x, ensymbleargs[x] ) ]
+                
             cmd += [ join( PACKAGE_FOLDER, package ), package ]
-            
             
             return Command( package, installed, ensymble, ENV = os.environ )
         
@@ -114,17 +177,20 @@ def SymbianHelp( *args  ):
     return helpresult
     
 
+PKG_DATA = {}
 def ToPackage( env, package_drive_map, package, target, source ):
     
     if package is None:
         return
         
     import re
-    
     # WARNING: Copying to any/c/e is custom Ensymble feature.
     drive = ""
     
+    pkg = PKG_DATA.get(package, {} )
+    
     if package_drive_map is not None:
+            
         # Goes to any by default
         drive = "any"    
         filename = os.path.basename( source )
@@ -139,7 +205,15 @@ def ToPackage( env, package_drive_map, package, target, source ):
                 drive = d
                 break
                 
-    return env.Install( join( PACKAGE_FOLDER, package, drive, target ), source )                      
+    pkgsource = join( PACKAGE_FOLDER, package, drive, target, basename( source ) )
+    pkg[pkgsource] = join( drive, target, basename( source ) )
+    env.Depends( pkgname(package), join( PACKAGE_FOLDER, package, pkg[pkgsource] )  )
+    if drive == "":
+        pkg[pkgsource] = join( "any", target, basename( source ) )
+    PKG_DATA[package] = pkg
+    
+    cmd = env.Install( join( PACKAGE_FOLDER, package, drive, target ), source )                      
+    return cmd
     
 def SymbianProgram( target, targettype = None, 
                     sources = None, includes = None, 
@@ -446,8 +520,8 @@ def SymbianProgram( target, targettype = None,
                 includefolder = EPOC32_INCLUDE
                 
                 installfolder = []
-                if package != "": 
-                    installfolder.append( package )
+                #if package != "": 
+                    #installfolder.append( package )
                 if rss_notype.endswith( "_reg" ):
                     installfolder.append( join( "private", "10003a3f","import","apps" ) )
                 else:
@@ -464,8 +538,7 @@ def SymbianProgram( target, targettype = None,
                 rsc_filename = "%s.%s" % ( rss_notype, "rsc" )
                 # Copy to sis creation folder                
                 ToPackage( env, package_drive_map, package, 
-                    join( "resource", "apps"), 
-                    converted_rsc )
+                           installfolder, converted_rsc )
 
                 # Copy to /epoc32/include/
                 includepath = join( includefolder, "%s.%s" % ( rss_notype, "rsg" ) )
