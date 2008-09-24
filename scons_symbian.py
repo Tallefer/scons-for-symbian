@@ -84,7 +84,7 @@ def SymbianPackage( package, ensymbleargs = None, pkgargs = None, pkgfile=None, 
             
             Install( join( PACKAGE_FOLDER, package, target ), source )
             if COMPILER == COMPILER_WINSCW:
-                Install( join( WINSCW_SIMULATOR_ROOT, target ),   source )
+                Install( join( FOLDER_EMULATOR_C, target ),   source )
         
         PKG_DATA[package] = pkg
         
@@ -204,14 +204,17 @@ def ToPackage( env, package_drive_map, package, target, source ):
             if regexp.match( filename ):
                 drive = d
                 break
-                
-    pkgsource = join( PACKAGE_FOLDER, package, drive, target, basename( source ) )
+    
+    # Add to pkg generator
+    pkgsource      = join( PACKAGE_FOLDER, package, drive, target, basename( source ) )
     pkg[pkgsource] = join( drive, target, basename( source ) )
     env.Depends( pkgname(package), join( PACKAGE_FOLDER, package, pkg[pkgsource] )  )
+    
     if drive == "":
         pkg[pkgsource] = join( "any", target, basename( source ) )
     PKG_DATA[package] = pkg
     
+    # Do the copy
     cmd = env.Install( join( PACKAGE_FOLDER, package, drive, target ), source )                      
     return cmd
     
