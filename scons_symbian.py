@@ -386,6 +386,12 @@ def SymbianProgram( target, targettype = None,
 
     OUTPUT_FOLDER  = get_output_folder(COMPILER,RELEASE, target, targettype )
     
+    # ???: SCons is able to compile sources with OUTPUT_FOLDER 
+    #      but not able to detect if the files have changed without
+    #      explicit dependency!! Without OUTPUT_FOLDER the resulting object
+    #      files are stored in the same folder as sources causing cross compiling
+    #      to fail.
+    extra_depends.extend( sources )
     sources = [ join( OUTPUT_FOLDER, x) for x in sources ]
     
     # This is often needed
