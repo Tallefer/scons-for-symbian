@@ -11,3 +11,10 @@ RELEASE = RELEASE_UDEB
 COMPILER = COMPILER_WINSCW
 
 DO_CREATE_SIS = False
+
+
+# These are enabled from FP1 onwards on regular scripts. 
+# Positioning module stops working on PyS60 ==> removed.
+# -O2 -fno-unit-at-a-time"
+GCCE_OPTIMIZATION_FLAGS = ""
+

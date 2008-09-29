@@ -42,8 +42,6 @@ WARNINGS_C =  "-Wall -Wno-unknown-pragmas -fexceptions " \
             "-march=armv5t -mapcs -pipe -nostdinc -msoft-float"
 WARNINGS_CXX = WARNINGS_C + " -Wno-ctor-dtor-privacy"
             
-# These are enabled from FP1 onwards on regular scripts. Reduces size of the binaries.
-GCCE_OPTIMIZATION_FLAGS = "-O2 -fno-unit-at-a-time"
 
 def create_environment( target,
                         targettype,

@@ -12,7 +12,7 @@ from config import *
 from SCons.Script import ARGUMENTS, Options, DefaultEnvironment, EnumOption, Variables, EnumVariable, Help
 
 VARS = Variables('arguments.py')
-def GetArg( name, help, default, allowed_values = None ):
+def GetArg( name, help, default, allowed_values = None, caseless=True ):
     """Utility for adding help information and retrieving argument"""
     
     if allowed_values is not None:
@@ -22,7 +22,7 @@ def GetArg( name, help, default, allowed_values = None ):
     else:
         VARS.Add( name, help, default )            
     value = ARGUMENTS.get( name, default )
-    if value is not None:
+    if value is not None and caseless:
         value = value.lower()
     return value
 
@@ -73,6 +73,11 @@ RELEASE    = GetArg( "release", "Release type.", RELEASE, RELEASETYPES )
 
 #: Location for the packages. Value generated in run-time.
 PACKAGE_FOLDER = join( "%s_%s" % ( COMPILER, RELEASE ), "packages" )
+
+#: Compiler flags for GCCE
+GCCE_OPTIMIZATION_FLAGS = GetArg( "gcce_options", "GCCE compiler options.", 
+                                    GCCE_OPTIMIZATION_FLAGS, 
+                                    caseless = False )
 
 DO_CREATE_SIS = GetArg( "dosis", "Create SIS package.", str(DO_CREATE_SIS).lower(), [ "true", "false"] ) 
 DO_CREATE_SIS = DO_CREATE_SIS == "true" 
@@ -237,29 +242,45 @@ def get_output_folder(compiler, release, target, targettype ):
 
 # Generate help message
 def __generate_help_message():
-    # SCons gets into somekind of infinite loop if this file is imported directly
+    
+    separator = "=" * 79 + "\n"
+    # SCons gets into some kind of infinite loop if this file is imported directly
     # as it is done with EpyDoc.        
-    ENV = DefaultEnvironment(variables = VARS )
-    msg = "SCons for Symbian arguments:"
-    msg += "\n" + "=" *  len( msg )
+    
+    ENV = DefaultEnvironment(variables = VARS )    
+    msg = "SCons for Symbian arguments:\n"
+    msg += separator    
     msg += VARS.GenerateHelpText(ENV).replace( "\n    a", " | a") 
     Help( msg )    
+    
+    Help( separator )
     
 #: Flag to disable processing to shorten time to display help message
 HELP_ENABLED = False    
 for _x in [ "-h", "-H", "--help"]:
     if _x in sys.argv:
         HELP_ENABLED = True
-        __generate_help_message()
+        __generate_help_message()        
         break    
 
-#if VARS.UnknownVariables():
-#   print "Unknown variables:", VARS.UnknownVariables().keys()
-#   print "To avoid this message, add your own"
-#   print "variables with arguments.py->GetArg or use Variables()"
-#   raise SystemExit()
-   
+# Check if WINSCW is found
+def __winscw_in_path():
+    if COMPILER == COMPILER_WINSCW:        
+        for x in os.environ["PATH"].split(";"):            
+            if os.path.exists(x):
+                if "mwccsym2.exe" in [ x.lower() for x in os.listdir(x) ]:
+                    return True
+        return False 
+    return True
+    
+if not __winscw_in_path():
+    
+    print "\nERROR"
+    print "-" * 79
+    print "WINSCW compiler 'mwccsym2.exe' not found from PATH." 
+    print "Install Carbide and run configuration\\run_env_update.bat"
+    if not HELP_ENABLED:
+        raise SystemExit(-1)      
    
 del _p
 del _x
-#del x
