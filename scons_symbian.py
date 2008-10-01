@@ -42,7 +42,7 @@ def _create_environment( *args, **kwargs ):
         env = winscw.create_environment( *args, **kwargs )
     else:
         msg = "Error: Environment for '%s' is not implemented" % COMPILER
-        raise NotImplemented( msg )
+        raise NotImplementedError( msg )
     return env
 
 def pkgname( sisname ):

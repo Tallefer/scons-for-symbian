@@ -58,10 +58,7 @@ if sys.platform == "linux2":
     
 #: Path to arm toolchain. Detected automatically from path using 'CSL Arm Toolchain' on Windows or csl-gcc on Linux
 PATH_ARM_TOOLCHAIN = [ _x for _x in _p.split( os.path.pathsep ) if CSL_ARM_TOOLCHAIN_FOLDER_NAME in _x ]
-if len( PATH_ARM_TOOLCHAIN) > 0:
-    PATH_ARM_TOOLCHAIN = PATH_ARM_TOOLCHAIN[0]
-else:
-    print "Warning: Unable to find '%s' from path. GCCE building will fail." % CSL_ARM_TOOLCHAIN_FOLDER_NAME
+
         
 # Parse arguments -------------------------------------------------------------
 
@@ -262,6 +259,15 @@ for _x in [ "-h", "-H", "--help"]:
         HELP_ENABLED = True
         __generate_help_message()        
         break    
+
+# Check if GCCE setup is correct
+if len( PATH_ARM_TOOLCHAIN) > 0:
+    PATH_ARM_TOOLCHAIN = PATH_ARM_TOOLCHAIN[0]
+elif COMPILER == COMPILER_GCCE:
+    print "\nERROR"
+    print "-" * 79
+    print "Error: Unable to find '%s' from path. GCCE building will fail." % CSL_ARM_TOOLCHAIN_FOLDER_NAME
+    raise SystemExit(-1)
 
 # Check if WINSCW is found
 def __winscw_in_path():

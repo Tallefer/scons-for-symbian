@@ -8,7 +8,9 @@ import os
 import sys
 import subprocess as sp
 
-from SCons.Platform import win32
+import SCons
+
+from SCons.Platform import win32, posix
 
 #: Pyreadline console
 CONSOLE = None
@@ -28,7 +30,13 @@ class Colors:
     ERROR   = 12
     NORMAL  = 7
     COMMENT = 10
-
+    
+if sys.platform == "linux2":
+    Colors.WARNING = 33
+    Colors.ERROR   = 31
+    Colors.NORMAL  = 0
+    Colors.COMMENT = 32
+    
 #: Get initial color of the console
 if CONSOLE is not None:
     Colors.NORMAL = CONSOLE.attr
@@ -39,9 +47,10 @@ KEYWORD_ERRORS = [ x.lower() for x in [ "error:", " error ", "failed", " undefin
                "was expected", "The process cannot access",
                "No such file or directory", "*** "
                "Cannot convert", "needed by", "explicit dependency" ] ]
+KEYWORD_ERRORS.sort()
 
 #: Excluded errors
-KEYWORD_ERRORS_EXCLUDE = [ "error." ]
+KEYWORD_ERRORS_EXCLUDE = [ "error.c", "error.cpp", "error.h"  ]
 
 #: Drawn with Colors.COMMENT
 KEYWORD_COMMENT  = [ x.lower() for x in [ "scons:", "note:", "copy(", "install file"] ]
@@ -88,8 +97,18 @@ def subsitute_env_vars(line, env):
 def write( line, color ):
     """Write line with color"""
     global CONSOLE
-    
-    if CONSOLE is not None:
+
+    if os.name == "posix":
+
+        msg="%02i" % color
+        savedstdout.write( "\x1b[%sm" % (msg) )
+        savedstdout.write( line )
+        
+        # Reset
+        msg="%02i" % 0
+        savedstdout.write( "\x1b[%sm" % (msg) )
+
+    elif CONSOLE is not None:
         try:
             CONSOLE.write_color( line, color)
             CONSOLE.write_color( "", CONSOLE.attr)
@@ -146,29 +165,46 @@ class OutputConsole(ConsoleBase):
         sys.stdout       = self
         sys.stderr       = self
         
-        win32.spawn = self.spawn
-
+        win32.spawn          = self.spawn
+        posix.spawnvpe_spawn = self.spawn
+        
     def spawn( self, sh, escape, cmd, args, env):
         """
         Replaces SCons.Platform.spawn to colorize output of
         external processes
         """
-
+        #import pdb;pdb.set_trace()
         args = [ subsitute_env_vars( x.replace('"', '' ), env ) for x in args ]    
         
-        # Long command support <= 32766
-        startupinfo          = sp.STARTUPINFO()
-        startupinfo.dwFlags |= sp.STARTF_USESHOWWINDOW
+        startupinfo = None
+        if os.name == "nt":
+            # Long command support <= 32766 for Windows
+            startupinfo          = sp.STARTUPINFO()
+            startupinfo.dwFlags |= sp.STARTF_USESHOWWINDOW
         
-        p = sp.Popen( args, bufsize = 1,
-                      stdout = sp.PIPE, stderr=sp.STDOUT,
-                      startupinfo = startupinfo,
-                      shell = False, env = env)
-
-        out, err = p.communicate( )
-        self.write( out )
-        result = p.wait()
-
+        stdout = sp.PIPE
+        #import pdb;pdb.set_trace()
+        if ( os.name == "posix" and args[0] == "wine"):
+            stdout = None
+            
+        p = sp.Popen( args, bufsize = 1024,
+                    stdout = stdout, stderr=sp.STDOUT,
+                    startupinfo = startupinfo,
+                    shell = False, env = env)
+        result = None
+        #import pdb;pdb.set_trace()
+        if p.stdout is not None:
+            while result is None:
+                # This is slow on Linux with Wine!!
+                line = p.stdout.readline()
+                self.write(line)
+                result = p.poll()
+            # Get the last lines
+            line = p.stdout.readline()
+            self.write(line)
+        else:
+            result = p.wait()
+            
         return result
         
     def write(self, text ):
