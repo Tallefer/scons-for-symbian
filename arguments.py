@@ -1,30 +1,27 @@
 """Reads and stores globals including the command line arguments"""
 
-__author__    = "Jussi Toivola"
-__license__   = "MIT License"
+__author__ = "Jussi Toivola"
+__license__ = "MIT License"
 
-import sys
-import os
+from SCons.Script import ARGUMENTS, DefaultEnvironment, HelpFunction as Help
+from SCons.Variables import Variables, EnumVariable
+from config import * #IGNORE:W0611
 from os.path import join
-
-from config import *
-
-from SCons.Script import ARGUMENTS, Options, DefaultEnvironment, EnumOption
-from SCons.Script import HelpFunction as Help                         
-from SCons.Variables import Variables, EnumVariable                       
+import os
+import sys
 
 #: Are we running a build? This is to avoid messing up code analyzers
 #: and Epydoc.
 RUNNING_SCONS = ( "scons" in sys.argv[0] or "-c" == sys.argv[0] )
 
-VARS = Variables('arguments.py')
-def GetArg( name, help, default, allowed_values = None, caseless=True ):
+VARS = Variables( 'arguments.py' )
+def GetArg( name, help, default, allowed_values = None, caseless = True ):
     """Utility for adding help information and retrieving argument"""
     
     if allowed_values is not None:
-        VARS.Add( EnumVariable( name, help, default, 
+        VARS.Add( EnumVariable( name, help, default,
                     allowed_values = allowed_values,
-                    ignorecase=2 ) )
+                    ignorecase = 2 ) )
     else:
         VARS.Add( name, help, default )            
     value = ARGUMENTS.get( name, default )
@@ -37,11 +34,11 @@ EPOCROOT = os.environ.get( "EPOCROOT", EPOCROOT )
 print "EPOCROOT=%s" % EPOCROOT
 
 #: Constant pointing to EPOCROOT/epoc32
-EPOC32         = join( EPOCROOT, 'epoc32' )
+EPOC32 = join( EPOCROOT, 'epoc32' )
 #: Constant pointing to system include folder
 EPOC32_INCLUDE = join( EPOC32, 'include' )
 #: Constant pointing to system tools folder
-EPOC32_TOOLS   = join( EPOC32, 'tools' )
+EPOC32_TOOLS = join( EPOC32, 'tools' )
 #: Constant pointing to release folder
 EPOC32_RELEASE = join( EPOC32, "release", COMPILER, RELEASE )    
 #: Constant pointing to emulator c drive
@@ -53,7 +50,7 @@ SYSTEM_INCLUDES = [ EPOC32_INCLUDE,
                 ]
            
 if sys.platform == "win32":
-    os.environ["EPOCROOT"] = EPOCROOT.replace("/", "\\")
+    os.environ["EPOCROOT"] = EPOCROOT.replace( "/", "\\" )
 else:
     os.environ["EPOCROOT"] = EPOCROOT
 
@@ -69,26 +66,26 @@ PATH_ARM_TOOLCHAIN = [ _x for _x in _p.split( os.path.pathsep ) if CSL_ARM_TOOLC
 # Parse arguments -------------------------------------------------------------
 
 #: Used compiler
-COMPILER   = GetArg( "compiler", "The compiler to use.", COMPILER, COMPILERS )
+COMPILER = GetArg( "compiler", "The compiler to use.", COMPILER, COMPILERS )
 
 #: Release type
-RELEASE    = GetArg( "release", "Release type.", RELEASE, RELEASETYPES )
+RELEASE = GetArg( "release", "Release type.", RELEASE, RELEASETYPES )
 
 #: Location for the packages. Value generated in run-time.
 PACKAGE_FOLDER = join( "%s_%s" % ( COMPILER, RELEASE ), "packages" )
 
 #: Compiler flags for GCCE
-GCCE_OPTIMIZATION_FLAGS = GetArg( "gcce_options", "GCCE compiler options.", 
-                                    GCCE_OPTIMIZATION_FLAGS, 
+GCCE_OPTIMIZATION_FLAGS = GetArg( "gcce_options", "GCCE compiler options.",
+                                    GCCE_OPTIMIZATION_FLAGS,
                                     caseless = False )
 
-DO_CREATE_SIS = GetArg( "dosis", "Create SIS package.", str(DO_CREATE_SIS).lower(), [ "true", "false"] ) 
+DO_CREATE_SIS = GetArg( "dosis", "Create SIS package.", str( DO_CREATE_SIS ).lower(), [ "true", "false"] ) 
 DO_CREATE_SIS = DO_CREATE_SIS == "true" 
 
 ENSYMBLE_AVAILABLE = False
 try:
     if COMPILER != COMPILER_WINSCW and DO_CREATE_SIS:
-        import ensymble
+        __import__( "ensymble" )
         ENSYMBLE_AVAILABLE = True
 except ImportError:
     print "Info: Automatic SIS creation requires Ensymble."
@@ -100,9 +97,9 @@ if not DO_CREATE_SIS:
     print "Info: SIS creation disabled"
 
 #: Constant for ui platform version
-UI_VERSION  = ( 3, 0 )
+UI_VERSION = ( 3, 0 )
 #: Symbian version of the SDK 
-SYMBIAN_VERSION = ( 9 ,1 )
+SYMBIAN_VERSION = ( 9 , 1 )
 
 #: SDK platform header( generated )
 #: S60 3rd & mr = EPOC32_INCLUDE + variant + symbian_os_v9.1.hrh
@@ -119,59 +116,61 @@ def _resolve_platform():
         raise RuntimeError( "'%s' does not exist. Invalid EPOCROOT?" % PLATFORM_HEADER )
         
     # These are the same on S60
-    sdk_header     = ""
+    sdk_header = ""
     symbian_header = ""
     
     uiplatform = UI_PLATFORM_S60
-    uiversion  = UI_VERSION
+    uiversion = UI_VERSION
      
     files = os.listdir( PLATFORM_HEADER )
     files.sort()
     
     for fname in files:
             
-        if fname.lower().startswith( "symbian_os") \
+        if fname.lower().startswith( "symbian_os" ) \
         and "vintulo" not in fname.lower():
             symbian_header = join( PLATFORM_HEADER, fname )
         
-        elif fname.lower().startswith( "uiq"):
+        elif fname.lower().startswith( "uiq" ):
             # symbian_header found earlier 
             assert symbian_header != ""
                        
             sdk_header = join( PLATFORM_HEADER, fname )
             uiplatform = UI_PLATFORM_UIQ
-            uiversion  = sdk_header.split("_")[1].split(".hrh")[0].split(".")
-            uiversion  = map( int, uiversion )
+            uiversion = sdk_header.split( "_" )[1].split( ".hrh" )[0].split( "." )
+            uiversion = map( int, uiversion )
             break
-            
-    if symbian_header == "": 
-        raise RuntimeError( "Unknown platform. Invalid EPOCROOT?")
     
-    symbian_version = symbian_header.split("_v")[1].split(".")[:2]
+    if symbian_header == "": 
+        raise RuntimeError( "Unknown platform. Invalid EPOCROOT?" )
+    
+    symbian_version = symbian_header.split( "_v" )[1].split( "." )[:2]
     
     if uiplatform == UI_PLATFORM_S60:
         # 9.2 FP1, 9.3 FP2
-        mapping    = { "91" : (3,0), "92" : ( 3,1 ), "93" : ( 3.2 ) }        
-        uiversion  = mapping[ "".join( symbian_version ) ]
+        mapping = { "91" : ( 3, 0 ), "92" : ( 3, 1 ), "93" : ( 3.2 ) }        
+        uiversion = mapping[ "".join( symbian_version ) ]
         sdk_header = symbian_header
     
     PLATFORM_HEADER = sdk_header
     UI_PLATFORM = uiplatform
-    UI_VERSION  = tuple( uiversion )
+    UI_VERSION = tuple( uiversion )
     SYMBIAN_VERSION = tuple( map( int, symbian_version ) )
     
 _resolve_platform()
           
 print "Info: Symbian OS version = %d.%d" % SYMBIAN_VERSION
-print "Info: UI platform        = %s"    % UI_PLATFORM, "%d.%d" % UI_VERSION
+print "Info: UI platform        = %s" % UI_PLATFORM, "%d.%d" % UI_VERSION
         
 #: Built components. One SConstruct can define multiple SymbianPrograms.
 #: This can be used from command-line to build only certain SymbianPrograms
 COMPONENTS = GetArg( "components", "Components to build. Separate with ','.", "all" )
 COMPONENTS_EXCLUDE = False
 
-def __processComponents( ):
-    components = COMPONENTS.lower().split(",")
+def __processComponents():
+    global COMPONENTS_EXCLUDE
+    
+    components = COMPONENTS.lower().split( "," )
     if "all" in components:
         
         if len( components ) == 1: # if all only
@@ -189,46 +188,46 @@ def __get_defines():
     
     tmp = GetArg( "defines", "Extra preprocessor defines. For debugging, etc.", None )
     if tmp is None: return []
-    tmp = tmp.split(",")
+    tmp = tmp.split( "," )
 
     defs = []
     for x in tmp:
         if "=" in x:
-            name, value = x.split("=")
+            name, value = x.split( "=" )
             if not value.isdigit():
                 value = r'/"' + value + r'/"'
 
             x = "=".join( [name, value] )
 
-        defs.append(x)
+        defs.append( x )
     return defs
 
 #: Command-line define support
 CMD_LINE_DEFINES = __get_defines()
 
 #: Extra libraries( debug library etc. )
-CMD_LINE_LIBS    = GetArg( "extra_libs", "Extra libraries. Debug libraries, etc.", None )
+CMD_LINE_LIBS = GetArg( "extra_libs", "Extra libraries. Debug libraries, etc.", None )
 if CMD_LINE_LIBS is not None: 
-    CMD_LINE_LIBS = CMD_LINE_LIBS.split(",")
+    CMD_LINE_LIBS = CMD_LINE_LIBS.split( "," )
     
 #: SDK Installation folder
-SDKFOLDER     =  os.path.join( EPOCROOT, 
-                               "epoc32", 
-                               "release", 
+SDKFOLDER = os.path.join( EPOCROOT,
+                               "epoc32",
+                               "release",
                                COMPILER,
                                RELEASE
                 )
 
 #: Default Symbian definitions.
 DEFAULT_SYMBIAN_DEFINES = [ "__SYMBIAN32__",
-                            "_UNICODE",                            
+                            "_UNICODE",
                             "__SUPPORT_CPP_EXCEPTIONS__",
                           ]
 
 # Add S60 macros                             
 if UI_PLATFORM == UI_PLATFORM_S60:        
     DEFAULT_SYMBIAN_DEFINES += [ "__SERIES60_%d%d__" % UI_VERSION ]    
-    DEFAULT_SYMBIAN_DEFINES += [ "__SERIES60_%dX__"  % UI_VERSION[0] ]
+    DEFAULT_SYMBIAN_DEFINES += [ "__SERIES60_%dX__" % UI_VERSION[0] ]
     # Not in regular build scripts
     DEFAULT_SYMBIAN_DEFINES += [ "__SERIES60__" ]                           
 #Add UIQ macros    
@@ -237,7 +236,7 @@ elif UI_PLATFORM == UI_PLATFORM_UIQ:
     # if you use these defines in your code, it becomes incompatible with them
     # You'll need to add these in your MMP with MACRO    
     DEFAULT_SYMBIAN_DEFINES += [ "__UIQ_%d%d__" % UI_VERSION ]
-    DEFAULT_SYMBIAN_DEFINES += [ "__UIQ_%dX__"  % UI_VERSION[0] ]
+    DEFAULT_SYMBIAN_DEFINES += [ "__UIQ_%dX__" % UI_VERSION[0] ]
     DEFAULT_SYMBIAN_DEFINES += [ "__UIQ__" ]
 
 DEFAULT_SYMBIAN_DEFINES += [ "__SYMBIAN_OS_VERSION__=%d%d" % SYMBIAN_VERSION ]
@@ -248,7 +247,7 @@ if RELEASE == RELEASE_UREL:
 else:
     DEFAULT_SYMBIAN_DEFINES.append( "_DEBUG" )
 
-def get_output_folder(compiler, release, target, targettype ):
+def get_output_folder( compiler, release, target, targettype ):
     return os.path.join( compiler + "_" + release, target + "_" + targettype )
 
 # Generate help message
@@ -258,10 +257,10 @@ def __generate_help_message():
     # SCons gets into some kind of infinite loop if this file is imported directly
     # as it is done with EpyDoc.        
     
-    ENV = DefaultEnvironment(variables = VARS )    
+    ENV = DefaultEnvironment( variables = VARS )    
     msg = "SCons for Symbian arguments:\n"
     msg += separator    
-    msg += VARS.GenerateHelpText(ENV).replace( "\n    a", " | a") 
+    msg += VARS.GenerateHelpText( ENV ).replace( "\n    a", " | a" ) 
     Help( msg )    
     
     Help( separator )
@@ -275,20 +274,20 @@ for _x in [ "-h", "-H", "--help"]:
         break    
 
 # Check if GCCE setup is correct
-if len( PATH_ARM_TOOLCHAIN) > 0:
+if len( PATH_ARM_TOOLCHAIN ) > 0:
     PATH_ARM_TOOLCHAIN = PATH_ARM_TOOLCHAIN[0]
 elif COMPILER == COMPILER_GCCE and RUNNING_SCONS:
     print "\nERROR"
     print "-" * 79
     print "Error: Unable to find '%s' from path. GCCE building will fail." % CSL_ARM_TOOLCHAIN_FOLDER_NAME
-    raise SystemExit(-1)
+    raise SystemExit( - 1 )#IGNORE:W1010
 
 # Check if WINSCW is found
 def __winscw_in_path():
     if COMPILER == COMPILER_WINSCW:        
-        for x in os.environ["PATH"].split(";"):            
-            if os.path.exists(x):
-                if "mwccsym2.exe" in [ x.lower() for x in os.listdir(x) ]:
+        for x in os.environ["PATH"].split( ";" ):            
+            if os.path.exists( x ):
+                if "mwccsym2.exe" in [ x.lower() for x in os.listdir( x ) ]:
                     return True
         return False 
     return True
@@ -300,7 +299,7 @@ if not __winscw_in_path() and RUNNING_SCONS:
     print "WINSCW compiler 'mwccsym2.exe' not found from PATH." 
     print "Install Carbide and run configuration\\run_env_update.bat"
     if not HELP_ENABLED and RUNNING_SCONS:
-        raise SystemExit(-1)      
-   
+        raise SystemExit( - 1 )#IGNORE:W1010      
+
 del _p
 del _x

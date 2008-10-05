@@ -3,16 +3,16 @@ Symbian project file(mmp) parser
 
 This file is part of SCons for Symbian project.
 """
-__author__    = "Jussi Toivola"
-__license__   = "MIT License"
+__author__ = "Jussi Toivola"
+__license__ = "MIT License"
 
 #TODO: Preprocess the mmp file
+from os.path import join, abspath
+from relpath import relpath
 import os
 import sys
-from os.path import join, dirname, abspath
-from relpath import relpath
 
-KEYWORDS =  ( "target", "targettype", "library", "source", "systeminclude", "userinclude", 
+KEYWORDS = ( "target", "targettype", "library", "source", "systeminclude", "userinclude",
               "staticlibary", "epocallowdlldata", "macro", "capability", "epocstacksize",
               "resources", "uid"
             )
@@ -29,8 +29,8 @@ class MMPParser:
         f.close()
         
         workingfolder = os.path.dirname( self.Source )
-        sourcepath    = workingfolder
-        curdir        = abspath( os.curdir )
+        sourcepath = workingfolder
+        curdir = abspath( os.curdir )
         
         lines = [x for x in lines if len( x.strip() ) > 0 ]        
         
@@ -39,7 +39,7 @@ class MMPParser:
         for x in KEYWORDS:
             result[x] = []
         result["epocallowdlldata"] = False # Not enabled with regular scripts either
-        result["epocstacksize"].append( hex(8 * 1024 ) )
+        result["epocstacksize"].append( hex( 8 * 1024 ) )
         result["uid"] += [ None, None]
         for line in lines:                        
             parts = line.split()
@@ -52,7 +52,7 @@ class MMPParser:
                         files = [ join( sourcepath, x ) for x in parts[1:] ]
                         items += files
                     elif keyword == "library":
-                        libs = [ x.replace(".lib", "") for x in parts[1:] ]
+                        libs = [ x.replace( ".lib", "" ) for x in parts[1:] ]
                         items += libs
                     elif keyword in [ "systeminclude", "userinclude"]:
                         items += [ join( workingfolder, x ) for x in parts[1:] ] 
@@ -70,12 +70,12 @@ class MMPParser:
                 print "Curdir:", sourcepath
                 
             elif keyword == "start":
-                result["resources"]   += [ join( sourcepath, parts[-1] ) ]
+                result["resources"] += [ join( sourcepath, parts[ - 1] ) ]
                 result["userinclude"] += [ sourcepath ]
         
         # Take targettype from file extension instead. TODO: special dlls.
-        result["targettype"]    = result["target"][0].split(".")[-1]
-        result["target"]        = ".".join( result["target"][0].split(".")[:-1] ) # Strip extension
+        result["targettype"] = result["target"][0].split( "." )[ - 1]
+        result["target"] = ".".join( result["target"][0].split( "." )[: - 1] ) # Strip extension
         result["epocstacksize"] = int( result["epocstacksize"][0], 16 )
         return result
 

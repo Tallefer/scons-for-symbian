@@ -1,25 +1,28 @@
 """Main module"""
-__author__    = "Jussi Toivola"
-__license__   = "MIT License"
+__author__ = "Jussi Toivola"
+__license__ = "MIT License"
+#pylint: disable-msg=E0611
 
-import os
+from SCons.Builder import Builder
+from SCons.Script import (Command, Copy, DefaultEnvironment, Install, Mkdir, 
+    Default)
+from arguments import * #IGNORE:W0611
 from os.path import join, basename
+import colorizer
+import gcce
+import os
+import symbian_pkg
+import winscw
 
-from SCons.Builder     import Builder
-from SCons.Script      import Command, Copy, \
-                              Depends, DefaultEnvironment, \
-                              Install, Default, Mkdir, Clean
-
-from arguments import *
-import winscw, gcce, colorizer, symbian_pkg
+#pylint: enable-msg=E0611
 
 #: Handle to console for colorized output( and process launching )
-_OUTPUT_COLORIZER = colorizer.OutputConsole(  )
+_OUTPUT_COLORIZER = colorizer.OutputConsole()
 
 # Set EPOCROOT as default target, so the stuff will be built for emulator.
 Default( EPOCROOT )
 Default( "." )
-    
+
 # TODO: freeze # perl -S /epoc32/tools/efreeze.pl %(FROZEN)s %(LIB_DEFS)s
 print "Building", COMPILER, RELEASE
 print "Defines", CMD_LINE_DEFINES
@@ -41,8 +44,8 @@ def _create_environment( *args, **kwargs ):
     return env
 
 
-def SymbianPackage( package, ensymbleargs = None, pkgargs = None, 
-                    pkgfile=None, extra_files = None, source_package = None ):
+def SymbianPackage( package, ensymbleargs = None, pkgargs = None,
+                    pkgfile = None, extra_files = None, source_package = None ):
     """
     Create Symbian Installer( sis ) file. Can use either Ensymble or pkg file.
     To enable creation, give command line arg: dosis=true
@@ -76,7 +79,7 @@ def SymbianPackage( package, ensymbleargs = None, pkgargs = None,
         source_package = package
         
     if extra_files is not None:
-        pkg = PKG_HANDLER.Package(package)
+        pkg = PKG_HANDLER.Package( package )
         
         for target, source in extra_files:
             pkg[source] = target
@@ -86,16 +89,16 @@ def SymbianPackage( package, ensymbleargs = None, pkgargs = None,
             ToPackage( DefaultEnvironment(), None, package, target, source )
                     
             if COMPILER == COMPILER_WINSCW:
-                Install( join( FOLDER_EMULATOR_C, target ),   source )
+                Install( join( FOLDER_EMULATOR_C, target ), source )
         
     def create_pkg_file( pkgargs ):
         
         if pkgargs is None:
             pkgargs = {}
         
-        PKG_HANDLER.PackageArgs(package).update( pkgargs )
+        PKG_HANDLER.PackageArgs( package ).update( pkgargs )
         PKG_HANDLER.pkg_sis[pkgfile] = source_package
-        return Command( pkgfile, None, 
+        return Command( pkgfile, None,
                         PKG_HANDLER.GeneratePkg, ENV = os.environ )
     
     if pkgargs is not None and COMPILER != COMPILER_WINSCW:    
@@ -107,13 +110,13 @@ def SymbianPackage( package, ensymbleargs = None, pkgargs = None,
         
         cmd = []
         
-        def ensymble( env, target = None, source = None ):
+        def ensymble( env, target = None, source = None ): #IGNORE:W0613
             """ Wrap ensymble simplesis command. """
             try:
-                print "Running simplesis:" + str(cmd)
+                print "Running simplesis:" + str( cmd )
                 simplesis( "scons", cmd )
-            except Exception, msg:
-                return str(msg)
+            except Exception, msg:#IGNORE:W0703
+                return str( msg )
                                     
         if pkgfile is None and ENSYMBLE_AVAILABLE:
              
@@ -125,12 +128,12 @@ def SymbianPackage( package, ensymbleargs = None, pkgargs = None,
             return Command( package, installed, ensymble, ENV = os.environ )
         
         elif pkgfile is not None:
-            return symbian_pkg.Makesis(pkgfile, package )
+            return symbian_pkg.Makesis( pkgfile, package )
  
     if DO_CREATE_SIS:
         return create_install_file( [] )
 
-def SymbianHelp( source, uid, env = None  ):
+def SymbianHelp( source, uid, env = None ):
     """ Generate help files for Context Help
     @param source: Help project file .cshlp"
     @uid: UID of the application.
@@ -149,7 +152,7 @@ def SymbianHelp( source, uid, env = None  ):
 #: This information is be used to generate the pkg file.
 PKG_HANDLER = symbian_pkg.PKGHandler()
 
-def ToPackage( env = None, package_drive_map = None, package = None, 
+def ToPackage( env = None, package_drive_map = None, package = None,
                target = None, source = None ):
     """Insert file into package.
     @param env: Environment. DefaultEnvironment() used if None.
@@ -163,10 +166,10 @@ def ToPackage( env = None, package_drive_map = None, package = None,
     @param target: Location on device
     @param source: Source path of the file    
     """
-    for attr in ["target","source"]:
+    for attr in ["target", "source"]:
         notnone = locals()[attr]
         if notnone is None:            
-            raise AttributeError("Error: '%s' is None." % attr )
+            raise AttributeError( "Error: '%s' is None." % attr )
     
     if env is None:
         env = DefaultEnvironment()
@@ -180,7 +183,7 @@ def ToPackage( env = None, package_drive_map = None, package = None,
     drive = ""
     
     # Gets reference.
-    pkg = PKG_HANDLER.Package(package)
+    pkg = PKG_HANDLER.Package( package )
     
     if package_drive_map is not None:
             
@@ -190,7 +193,7 @@ def ToPackage( env = None, package_drive_map = None, package = None,
         
         for d in package_drive_map:
             regexp = package_drive_map[d]       
-            if type(regexp) == str: 
+            if type( regexp ) == str: 
                 regexp = re.compile( regexp )
                 package_drive_map[d] = regexp
             
@@ -199,9 +202,9 @@ def ToPackage( env = None, package_drive_map = None, package = None,
                 break
     
     # Add to pkg generator
-    pkgsource      = join( PACKAGE_FOLDER, package, drive, target, basename( source ) )
+    pkgsource = join( PACKAGE_FOLDER, package, drive, target, basename( source ) )
     pkg[pkgsource] = join( drive, target, basename( source ) )
-    env.Depends( symbian_pkg.GetPkgFilename(package), join( PACKAGE_FOLDER, package, pkg[pkgsource] )  )
+    env.Depends( symbian_pkg.GetPkgFilename( package ), join( PACKAGE_FOLDER, package, pkg[pkgsource] ) )
     
     if drive == "":
         pkg[pkgsource] = join( "any", target, basename( source ) )    
@@ -210,19 +213,19 @@ def ToPackage( env = None, package_drive_map = None, package = None,
     cmd = env.Install( join( PACKAGE_FOLDER, package, drive, target ), source )                      
     return cmd
     
-def SymbianProgram( target, targettype = None, 
-                    sources = None, includes = None, 
+def SymbianProgram( target, targettype = None, #IGNORE:W0621
+                    sources = None, includes = None,
                     libraries = None, uid2 = None, uid3 = None,
                     definput = None, capabilities = None,
                     icons = None, resources = None,
-                    rssdefines = None, 
-                    defines    = None,
+                    rssdefines = None,
+                    defines = None,
                     help = None,
                     sysincludes = None,
                     # Sis stuff
-                    package  = "",
-                    package_drive_map = None,                 
-                    extra_depends     = None,                 
+                    package = "",
+                    package_drive_map = None,
+                    extra_depends = None,
                     **kwargs ):
     """
     Main function for compiling Symbian software. Handles the whole process
@@ -300,14 +303,14 @@ def SymbianProgram( target, targettype = None,
         p = mmp_parser.MMPParser( target )
         data = p.Parse()
         
-        target       = data["target"]
-        targettype   = data["targettype"]
-        sources      = data["source"]        
-        includes     = data["systeminclude"] + data["userinclude"]
-        resources    = data["resources"]
-        libraries    = data["library"]
-        uid2         = data["uid"][0]
-        uid3         = data["uid"][1]
+        target = data["target"]
+        targettype = data["targettype"]
+        sources = data["source"]        
+        includes = data["systeminclude"] + data["userinclude"]
+        resources = data["resources"]
+        libraries = data["library"]
+        uid2 = data["uid"][0]
+        uid3 = data["uid"][1]
         
         # Allow override in SConstruct
         if capabilities is None:
@@ -317,8 +320,8 @@ def SymbianProgram( target, targettype = None,
         if rssdefines is None:
             rssdefines = data["macro"][:]
         
-        kwargs["defines"]       = data["macro"][:]
-        kwargs["allowdlldata"]  = data["epocallowdlldata"]
+        kwargs["defines"] = data["macro"][:]
+        kwargs["allowdlldata"] = data["epocallowdlldata"]
         kwargs["epocstacksize"] = data["epocstacksize"]
     
     if includes is None:
@@ -374,13 +377,19 @@ def SymbianProgram( target, targettype = None,
     component_name = ".".join( [ target, targettype] ).lower()
     
     if COMPONENTS is not None:
-        if component_name not in COMPONENTS:
+        for component in COMPONENTS:
+            inlist = ( component_name in COMPONENTS )
+            if inlist and not COMPONENTS_EXCLUDE:
+                break
+            if not inlist and COMPONENTS_EXCLUDE:
+                break
+        else:
             print "Symbian component", component_name, "ignored"
             return None
 
     print "Getting dependencies for", ".".join( [target, targettype] )
 
-    OUTPUT_FOLDER  = get_output_folder(COMPILER,RELEASE, target, targettype )
+    OUTPUT_FOLDER = get_output_folder( COMPILER, RELEASE, target, targettype )
     
     # ???: SCons is able to compile sources with OUTPUT_FOLDER 
     #      but not able to detect if the files have changed without
@@ -388,14 +397,14 @@ def SymbianProgram( target, targettype = None,
     #      files are stored in the same folder as sources causing cross compiling
     #      to fail.
     extra_depends.extend( sources )
-    sources = [ join( OUTPUT_FOLDER, x) for x in sources ]
+    sources = [ join( OUTPUT_FOLDER, x ) for x in sources ]
     
     # This is often needed
     FOLDER_TARGET_TUPLE = ( OUTPUT_FOLDER, target )    
     Mkdir( OUTPUT_FOLDER )
     
     # Just give type of the file
-    TARGET_RESULTABLE   = "%s/%s" % FOLDER_TARGET_TUPLE + "%s"
+    TARGET_RESULTABLE = "%s/%s" % FOLDER_TARGET_TUPLE + "%s"
     
     
     env = _create_environment( target, targettype,
@@ -409,15 +418,15 @@ def SymbianProgram( target, targettype = None,
                           **kwargs )
     
     # Don't duplicate to ease use of IDE(Carbide)
-    env.BuildDir(OUTPUT_FOLDER, ".", duplicate=0 )
+    env.BuildDir( OUTPUT_FOLDER, ".", duplicate = 0 )
     
     if help:
         helpresult = SymbianHelp( help, uid3, env = env )
         if COMPILER == COMPILER_WINSCW:
-            env.Install( join( FOLDER_EMULATOR_C, "resource", "help" ), helpresult[0] )
+            env.Install( join( FOLDER_EMULATOR_C, "resource", "help" ), helpresult[0] )#IGNORE:E1101
         
-        ToPackage( env, package_drive_map, package, 
-                    join( "resource", "help" ), 
+        ToPackage( env, package_drive_map, package,
+                    join( "resource", "help" ),
                     helpresult[0] )
         #
         extra_depends.extend( helpresult )
@@ -433,18 +442,18 @@ def SymbianProgram( target, targettype = None,
             
             sdk_data_resource = EPOCROOT + r"epoc32/DATA/Z/resource/apps/%s"
             sdk_resource = join( EPOCROOT + r"epoc32", "release", COMPILER,
-                             RELEASE, "z",  "resource", "apps", "%s" )
+                             RELEASE, "z", "resource", "apps", "%s" )
             #package_resource = join( "resource", "apps")
             #if not os.path.exists(result_install): os.makedirs(result_install)
             #result_install += "%s"
 
             # Creates 32 bit icons
-            convert_icons_cmd = ( EPOCROOT + r'epoc32/tools/mifconv "%s" /c32 "%s"' ).replace("\\", "/" )
+            convert_icons_cmd = ( EPOCROOT + r'epoc32/tools/mifconv "%s" /c32 "%s"' ).replace( "\\", "/" )
             
             # TODO: Accept 2-tuple, first is the source, second: resulting name
             icon_target_path = join( OUTPUT_FOLDER, "%s_aif.mif" )
             icon_targets = [] # Icons at WINSCW/...
-            sdk_icons    = [] # Icons at /epoc32
+            sdk_icons = [] # Icons at /epoc32
             copyres_cmds = [] # Commands to copy icons from WINSCW/ to /epoc32
             for x in icons:
                 tmp = icon_target_path % ( target )
@@ -452,7 +461,7 @@ def SymbianProgram( target, targettype = None,
                 # Execute convert
                 env.Command( tmp, x, convert_icons_cmd % ( tmp, x ) )
                 
-                iconfilename = os.path.basename(tmp)
+                iconfilename = os.path.basename( tmp )
                 
                 sdk_target = sdk_resource % iconfilename
                 copyres_cmds.append( Copy( sdk_target, tmp ) )
@@ -466,8 +475,8 @@ def SymbianProgram( target, targettype = None,
                 #copyres_cmds.append( Copy( package_target, tmp ) )
                 #sdk_icons.append( package_target )
                 
-                ToPackage( env, package_drive_map, package, 
-                    join( "resource", "apps"), 
+                ToPackage( env, package_drive_map, package,
+                    join( "resource", "apps" ),
                     tmp )
                     
                 # Dependency
@@ -505,12 +514,12 @@ def SymbianProgram( target, targettype = None,
             prev_resource = None
             
             for rss_path in resources:
-                rss_notype = ".".join(os.path.basename(rss_path).split(".")[:-1]) # ignore rss
+                rss_notype = ".".join( os.path.basename( rss_path ).split( "." )[: - 1] ) # ignore rss
                 converted_rsg = join( OUTPUT_FOLDER, "%s.rsg" % rss_notype )
                 converted_rsc = join( OUTPUT_FOLDER, "%s.rsc" % rss_notype )
                 converted_resources.append( converted_rsc )
                 
-                result_paths  = [ ]
+                result_paths = [ ]
                 copyres_cmds = [ ]
 
                 res_compile_command = rcomp.RComp( env, converted_rsc, converted_rsg,
@@ -520,7 +529,7 @@ def SymbianProgram( target, targettype = None,
                              [PLATFORM_HEADER],
                              rssdefines )
                              
-                env.Depends(res_compile_command, converted_icons )
+                env.Depends( res_compile_command, converted_icons )
 
                 includefolder = EPOC32_INCLUDE
                 
@@ -528,7 +537,7 @@ def SymbianProgram( target, targettype = None,
                 #if package != "": 
                     #installfolder.append( package )
                 if rss_notype.endswith( "_reg" ):
-                    installfolder.append( join( "private", "10003a3f","import","apps" ) )
+                    installfolder.append( join( "private", "10003a3f", "import", "apps" ) )
                 else:
                     installfolder.append( join( "resource", "apps" ) )
                 installfolder = os.path.join( *installfolder )
@@ -542,7 +551,7 @@ def SymbianProgram( target, targettype = None,
 
                 rsc_filename = "%s.%s" % ( rss_notype, "rsc" )
                 # Copy to sis creation folder                
-                ToPackage( env, package_drive_map, package, 
+                ToPackage( env, package_drive_map, package,
                            installfolder, converted_rsc )
 
                 # Copy to /epoc32/include/
@@ -558,7 +567,7 @@ def SymbianProgram( target, targettype = None,
                         path_private_simulator = EPOCROOT + r"epoc32/DATA/Z/private/10003a3f/apps/%s" % rsc_filename
                         copy_file( converted_rsc, path_private_simulator )
 
-                        path_private_simulator = EPOCROOT +  r"epoc32/release/winscw/udeb/z/private/10003a3f/apps/%s" % rsc_filename
+                        path_private_simulator = EPOCROOT + r"epoc32/release/winscw/udeb/z/private/10003a3f/apps/%s" % rsc_filename
                         copy_file( converted_rsc, path_private_simulator )
 
                     else: # Copy normal resources to resource/apps folder
@@ -567,8 +576,6 @@ def SymbianProgram( target, targettype = None,
 
                         path_resource_simulator = EPOCROOT + r"epoc32/release/winscw/udeb/z/resource/apps/%s" % rsc_filename
                         copy_file( converted_rsc, path_resource_simulator )
-
-                header_rsg = env.Command( result_paths, converted_resources, copyres_cmds )
 
                 # Depend on previous. TODO: Use SCons Preprocessor scanner.
                 if prev_resource is not None:
@@ -584,8 +591,8 @@ def SymbianProgram( target, targettype = None,
     returned_command = None
 
     if COMPILER == COMPILER_GCCE:
-        output_lib    = ( targettype in DLL_TARGETTYPES )
-        temp_dll_path = TARGET_RESULTABLE % ("._tmp_" + targettype )
+        output_lib = ( targettype in DLL_TARGETTYPES )
+        temp_dll_path = TARGET_RESULTABLE % ( "._tmp_" + targettype )
         resultables = [ temp_dll_path ]
         
         if output_lib:
@@ -594,7 +601,7 @@ def SymbianProgram( target, targettype = None,
 
         build_prog = None
         if targettype != TARGETTYPE_LIB:
-            build_prog = env.Program( resultables, sources )
+            build_prog = env.Program( resultables, sources )#IGNORE:E1101
 
             # Depend on the libs
             for libname in libraries:
@@ -610,10 +617,10 @@ def SymbianProgram( target, targettype = None,
                 resultables.append( output_libpath )
 
             # Create final binary and lib/dso
-            env.Elf( resultables, temp_dll_path )
+            env.Elf( resultables, temp_dll_path )#IGNORE:E1101
 
         else:
-            build_prog = env.StaticLibrary( TARGET_RESULTABLE % ".lib" , sources )
+            build_prog = env.StaticLibrary( TARGET_RESULTABLE % ".lib" , sources )#IGNORE:E1101
             output_libpath = ( TARGET_RESULTABLE % ".lib",
                                 EPOCROOT + r"epoc32/release/armv5/%s/%s.lib" % ( RELEASE, target ) )
         
@@ -622,46 +629,45 @@ def SymbianProgram( target, targettype = None,
 
         # Compile sources ------------------------------------------------------
         # Creates .lib
+        def build_uid_cpp( target, source, env ):#IGNORE:W0613
+            """Create .UID.CPP for simulator"""
+            template = ""
+            if targettype == TARGETTYPE_EXE:
+                ## TODO: Set uid's
+                template = winscw.TARGET_UID_CPP_TEMPLATE_EXE % { "UID3": uid3 }
+            else:
+                template = winscw.TARGET_UID_CPP_TEMPLATE_DLL
 
-        def build_uid_cpp(target, source, env):
-           """Create .UID.CPP for simulator"""
-           template = ""
-           if targettype == TARGETTYPE_EXE:
-               ## TODO: Set uid's
-               template = winscw.TARGET_UID_CPP_TEMPLATE_EXE % { "UID3": uid3 }
-           else:
-               template = winscw.TARGET_UID_CPP_TEMPLATE_DLL
-
-           f = open(uid_cpp_filename,'w');f.write( template );f.close()
-           return None
+            f = open( uid_cpp_filename, 'w' );f.write( template );f.close()
+            return None
 
         # Create <target>.UID.CPP from template---------------------------------
         uid_cpp_filename = TARGET_RESULTABLE % ".UID.cpp"
 
-        bld = Builder(action = build_uid_cpp,
+        bld = Builder( action = build_uid_cpp,
                       suffix = '.UID.cpp' )
-        env.Append( BUILDERS = {'CreateUID' : bld})
-        env.CreateUID(uid_cpp_filename, sources)
+        env.Append( BUILDERS = {'CreateUID' : bld} )
+        env.CreateUID( uid_cpp_filename, sources )#IGNORE:E1101
 
         # We need to include the UID.cpp also
         sources.append( uid_cpp_filename )
 
         # Compile the sources. Create object files( .o ) and temporary dll.
-        output_lib    = ( targettype in DLL_TARGETTYPES )
-        temp_dll_path = TARGET_RESULTABLE % ("._tmp_" + targettype )
+        output_lib = ( targettype in DLL_TARGETTYPES )
+        temp_dll_path = TARGET_RESULTABLE % ( "._tmp_" + targettype )
         resultables = [ temp_dll_path ]
 
         if output_lib:
             # No libs from exes
             libname = target + ".lib"
             resultable_path = TARGET_RESULTABLE % "._tmp_lib"
-            resultables.append(resultable_path )
+            resultables.append( resultable_path )
             #resultables.append( TARGET_RESULTABLE % ".inf" )
             output_libpath = ( TARGET_RESULTABLE % ".lib",
                                 join( EPOC32_RELEASE, libname ) )
         
         if targettype != TARGETTYPE_LIB:
-            build_prog = env.Program( resultables, sources )
+            build_prog = env.Program( resultables, sources )#IGNORE:E1101
             # Depends on the used libraries. This has a nice effect since if,
             # this project depends on one of the other projects/components/dlls/libs
             # the depended project is automatically built first.
@@ -671,7 +677,7 @@ def SymbianProgram( target, targettype = None,
             env.Depends( build_prog, converted_resources )
             env.Depends( build_prog, resource_headers )
         else:
-            build_prog = env.StaticLibrary( TARGET_RESULTABLE % ".lib" , sources )
+            build_prog = env.StaticLibrary( TARGET_RESULTABLE % ".lib" , sources )#IGNORE:E1101
             output_libpath = ( TARGET_RESULTABLE % ".lib",
                                 join( EPOC32_RELEASE, "%s.lib" % ( target ) ) )
         
@@ -688,18 +694,18 @@ def SymbianProgram( target, targettype = None,
                 'mwldsym2.exe -S -show only,names,unmangled,verbose -o "%s" "%s"' % ( TARGET_RESULTABLE % ".inf", TARGET_RESULTABLE % "._tmp_lib" ),
                 # Creates def file
                 r'perl -S %EPOCROOT%epoc32/tools/makedef.pl -absent __E32Dll ' + '-Inffile "%s" ' % ( TARGET_RESULTABLE % ".inf" )
-                + definput
-                + ' "%s"' % ( TARGET_RESULTABLE % '.def' ) ] )
+ + definput
+ + ' "%s"' % ( TARGET_RESULTABLE % '.def' ) ] )
 
             defbld = Builder( action = action,
                               ENV = os.environ )
             env.Append( BUILDERS = {'Def' : defbld} )
-            env.Def( TARGET_RESULTABLE % ".def",
+            env.Def( TARGET_RESULTABLE % ".def", #IGNORE:E1101
                      TARGET_RESULTABLE % "._tmp_lib" )
 
         # NOTE: If build folder is changed this does not work anymore.
         # List compiled sources and add to dependency list
-        object_paths = [ ".".join( x.split(".")[:-1] ) + ".o" for x in sources ]
+        object_paths = [ ".".join( x.split( "." )[: - 1] ) + ".o" for x in sources ] #IGNORE:W0631
         
         # Sources depend on the headers generated from .rss files.
         env.Depends( object_paths, resource_headers )
@@ -712,11 +718,11 @@ def SymbianProgram( target, targettype = None,
         objects = " ".join( objects )
 
         libfolder = "%EPOCROOT%epoc32/release/winscw/udeb/"
-        libs      = [ libfolder + x for x in libraries]
+        libs = [ libfolder + x for x in libraries]
     
         if targettype in DLL_TARGETTYPES and targettype != TARGETTYPE_LIB:
 
-            env.Command( TARGET_RESULTABLE % ("." + targettype ), [ temp_dll_path, TARGET_RESULTABLE % ".def" ],
+            env.Command( TARGET_RESULTABLE % ( "." + targettype ), [ temp_dll_path, TARGET_RESULTABLE % ".def" ],
             [
                 " ".join( [
                             'mwldsym2 -msgstyle gcc',
@@ -728,7 +734,7 @@ def SymbianProgram( target, targettype = None,
                             '-implib "%s"' % ( TARGET_RESULTABLE % ".lib" ),
                             '-addcommand "out:%s.%s"' % ( target, targettype ),
                             '-warnings off',
-                            '-l %s' % " -l ".join( set(object_folders) ),
+                            '-l %s' % " -l ".join( set( object_folders ) ),
                             '-search ' + objects,
                           ]
                         )
@@ -753,11 +759,11 @@ def SymbianProgram( target, targettype = None,
             )
     
     for dep in extra_depends:
-        env.Depends(sources, dep)
-        env.Depends(build_prog, dep)
+        env.Depends( sources, dep )
+        env.Depends( build_prog, dep )
         #env.Depends(object_paths, dep)
         
-    def copy_result_binary( ):
+    def copy_result_binary():
         """Copy the linked binary( exe, dll ) for emulator
         and to resultables folder.
         """
@@ -773,11 +779,12 @@ def SymbianProgram( target, targettype = None,
         
         installpath = join( installfolder, "%s.%s" % ( target, targettype ) )
         
-        # Combine with installfolder copying. TODO: Not needed anymore since EPOCROOT is default target.
+        # Combine with installfolder copying. 
+        #TODO: Not needed anymore since EPOCROOT is default target.
         postcommands = []
-        copysource      = TARGET_RESULTABLE % ( "."+targettype)
+        copysource = TARGET_RESULTABLE % ( "." + targettype )
         target_filename = target + "." + targettype
-        sdkpath         = join( SDKFOLDER, target_filename )
+        sdkpath = join( SDKFOLDER, target_filename )
 
         installed = []
         if COMPILER == COMPILER_WINSCW:
@@ -787,22 +794,25 @@ def SymbianProgram( target, targettype = None,
 
         if output_libpath is not None and \
         ( COMPILER == COMPILER_WINSCW or targettype == TARGETTYPE_LIB ):
-            s,t = output_libpath
+            s, t = output_libpath
             postcommands.append( Copy( t, s ) )
             installed.append( t )
-
+            
         # Last to avoid copying to installpath if sdkfolder fails        
         postcommands.append( Copy( installpath, copysource ) )
-        installed.append(installpath )
-        returned_command = env.Command( installed , copysource, postcommands )
+        installed.append( installpath )
+        
+        returned_command = env.Command( installed, #IGNORE:W0612
+                                        copysource,
+                                        postcommands )
         
         if targettype != TARGETTYPE_LIB:
-            ToPackage( env, package_drive_map, package, 
-                    installfolder, 
+            ToPackage( env, package_drive_map, package,
+                    installfolder,
                     copysource )
         else:  # Don't install libs to device.
-            ToPackage( env, None, None, 
-                    "lib", 
+            ToPackage( env, None, None,
+                    "lib",
                     copysource )
                     
         return installed

@@ -4,10 +4,9 @@ Preprocessor utility
 __author__    = "Jussi Toivola"
 __license__   = "MIT License"
 
+from os.path import abspath
 import os
 import sys
-from os.path import abspath
-from SCons.Script import Command
 
 CPP = os.environ["EPOCROOT"] + os.path.join( "epoc32", "gcc", "bin", "cpp" )
 

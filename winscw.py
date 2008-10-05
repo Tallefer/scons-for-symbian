@@ -1,13 +1,11 @@
 """Environment for WINSCW compiler"""
 
-__author__    = "Jussi Toivola"
-__license__   = "MIT License"
-
-import textwrap
-from arguments import *
-#import spawn
+__author__ = "Jussi Toivola"
+__license__ = "MIT License"
 
 from SCons.Environment import Environment
+from arguments import * #IGNORE:W0611
+import textwrap
 
 DEFAULT_WINSCW_DEFINES = DEFAULT_SYMBIAN_DEFINES[:]
 DEFAULT_WINSCW_DEFINES += [
@@ -43,15 +41,14 @@ def create_environment( target,
                         uid3,
                         definput = None,
                         capabilities = None,
-                        defines = None, 
+                        defines = None,
                         **kwargs  
                         ):
     """Create WINSCW environment
     @param kwargs: ignored keyword arguments.
     @see: L{scons_symbian.SymbianProgram}
     """
-    # Add .lib if file extension does not exist
-    newlibs = []
+
     for x in xrange( len( libraries ) ):
         lib = libraries[x]
         if "." not in lib:
@@ -59,8 +56,8 @@ def create_environment( target,
             
     OUTPUT_FOLDER = get_output_folder( COMPILER, RELEASE, target, targettype )
 
-    LIBPATH   = SYMBIAN_WINSCW_LIBPATHLIB
-    LIBRARIES = [ os.path.normpath(LIBPATH + x ).lower() for x in libraries ]    
+    LIBPATH = SYMBIAN_WINSCW_LIBPATHLIB
+    LIBRARIES = [ os.path.normpath( LIBPATH + x ).lower() for x in libraries ]    
     
     defines.extend( DEFAULT_WINSCW_DEFINES )
     defines.extend( CMD_LINE_DEFINES )
@@ -75,7 +72,7 @@ def create_environment( target,
      #%(EPOCROOT)sepoc32/RELEASE/WINSCW/UDEB/euser.lib %(EPOCROOT)sepoc32/release/WINSCW/UDEB/efsrv.lib
     LINKFLAGS = ""
     if targettype in DLL_TARGETTYPES:
-        LINKFLAGS     = """
+        LINKFLAGS = """
                     -msgstyle gcc
                     -stdlib "%(EPOCROOT)sepoc32/release/winscw/udeb/edll.lib"
                     -noentry -shared
@@ -90,7 +87,7 @@ def create_environment( target,
                      """
 
     elif targettype == TARGETTYPE_EXE:
-        LINKFLAGS     = """
+        LINKFLAGS = """
                     -msgstyle gcc
                     -stdlib "%(EPOCROOT)sepoc32/release/winscw/udeb/eexe.lib"
                     -m "?_E32Bootstrap@@YGXXZ"
@@ -102,7 +99,7 @@ def create_environment( target,
     #-o "%(TARGET)s.%(TARGETTYPE)s"
     #import textwrap
     LINKFLAGS = textwrap.dedent( LINKFLAGS )
-    LINKFLAGS = " ".join( [ x.strip() for x in LINKFLAGS.split("\n") ] )
+    LINKFLAGS = " ".join( [ x.strip() for x in LINKFLAGS.split( "\n" ) ] )
 
     LINKFLAGS = LINKFLAGS % {"TARGET"     : target,
                              "TARGETTYPE" : targettype,
@@ -110,9 +107,6 @@ def create_environment( target,
                              "COMPILER"   : COMPILER,
                              "OUTPUT_FOLDER": OUTPUT_FOLDER }
 
-
-    COMPILER_INCLUDE = os.path.normpath( EPOCROOT + "/epoc32/include/gcce/gcce.h" )
-    
     platform_header = os.path.basename( PLATFORM_HEADER )
     if len( sysincludes ) > 0:
         sysincludes = "-I" + " -I".join( sysincludes )
@@ -121,36 +115,29 @@ def create_environment( target,
         
     env = Environment( 
                     tools = ["mingw"], # Disable searching of tools
-                    ENV = os.environ,#os.environ['PATH'],
+                    
+                    CC = r'mwccsym2',
+                    CXX = r'mwccsym2',
+                    
+                    ENV = os.environ, #os.environ['PATH'],
                     # Static library settings
-                    AR  = r'mwldsym2',
+                    AR = r'mwldsym2',
                     ARFLAGS = "-library -msgstyle gcc -stdlib -subsystem windows -noimplib -o",
                     RANLIBCOM = "",
                     LIBPREFIX = "",
+
+                    CPPPATH = includes,
+                    CPPDEFINES = defines,
+                    CCFLAGS = WINSCW_CC_FLAGS + ' -cwd source -I- %s -include "%s"' % ( sysincludes, platform_header ),
+                    INCPREFIX = "-i ",
+                    CPPDEFPREFIX = "-d ",
                     
-                   CC  = r'mwccsym2',
-                   CXX = r'mwccsym2',
-                   #CCCOMFLAGS= '$CPPFLAGS $_CPPDEFFLAGS $_CPPINCFLAGS -o $TARGET $SOURCES',
-                   #CCFLAGS = WINSCW_CC_FLAGS,#'-O2',
-                   CPPPATH =  includes,
-                   CPPDEFINES = defines,
-                   #CXXFLAGS   = WINSCW_CC_FLAGS + ' -cwd source -i- -include "Symbian_OS_v9.1.hrh"',
-                   CCFLAGS     = WINSCW_CC_FLAGS + ' -cwd source -I- %s -include "%s"' % ( sysincludes, platform_header ),
-                   INCPREFIX  = "-i ",
-                   CPPDEFPREFIX = "-d ",
-                   # Linker settings
-                    LINK    = r'mwldsym2',
-#                     LIBPATH = [
-#                                  r"D:/Symbian/CSL Arm Toolchain/lib/gcc/arm-none-symbianelf/3.4.3",
-#                                  r"D:/Symbian/CSL Arm Toolchain/arm-none-symbianelf/lib"
-#                               ],
-                    LINKFLAGS     = LINKFLAGS,
-                    LIBS          = LIBRARIES,
+                    # Linker settings
+                    LINK = r'mwldsym2',
+                    LINKFLAGS = LINKFLAGS,
+                    LIBS = LIBRARIES,
                     LIBLINKPREFIX = " ",
-                    PROGSUFFIX    = "." + targettype,
+                    PROGSUFFIX = "." + targettype,
 
                 )
-    #env["SPAWN"] = spawn.SubprocessSpawn()
-    #env["SPAWN"] = spawn.win32_spawn
-
     return env
