@@ -85,7 +85,8 @@ class PKGHandler:
         #Depends( package, pkgfilename )
         
         print "Creating pkg", pkgfilename
-        f=codecs.open( pkgfilename, 'wb', encoding="utf-16le");
+        #f=codecs.open( pkgfilename, 'wb', encoding="utf-16le");
+        f = open( pkgfilename, 'w' );
                 
         files   = self.Package(package)
         pkgargs = self.PackageArgs(package)

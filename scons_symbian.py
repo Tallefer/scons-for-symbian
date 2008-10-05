@@ -81,7 +81,10 @@ def SymbianPackage( package, ensymbleargs = None, pkgargs = None,
         for target, source in extra_files:
             pkg[source] = target
             
-            Install( join( PACKAGE_FOLDER, package, target ), source )
+            #Install( join( PACKAGE_FOLDER, package, target ), source )
+            #
+            ToPackage( DefaultEnvironment(), None, package, target, source )
+                    
             if COMPILER == COMPILER_WINSCW:
                 Install( join( FOLDER_EMULATOR_C, target ),   source )
         
@@ -89,7 +92,7 @@ def SymbianPackage( package, ensymbleargs = None, pkgargs = None,
         
         if pkgargs is None:
             pkgargs = {}
-                
+        
         PKG_HANDLER.PackageArgs(package).update( pkgargs )
         PKG_HANDLER.pkg_sis[pkgfile] = source_package
         return Command( pkgfile, None, 

@@ -15,7 +15,7 @@ from SCons.Variables import Variables, EnumVariable
 
 #: Are we running a build? This is to avoid messing up code analyzers
 #: and Epydoc.
-RUNNING_SCONS = ( "scons" in sys.argv[0] )
+RUNNING_SCONS = ( "scons" in sys.argv[0] or "-c" == sys.argv[0] )
 
 VARS = Variables('arguments.py')
 def GetArg( name, help, default, allowed_values = None, caseless=True ):
@@ -110,6 +110,8 @@ PLATFORM_HEADER = join( EPOC32_INCLUDE, "variant" )
 
 def _resolve_platform():    
     """Find out current SDK version"""
+    global PLATFORM_HEADER, UI_PLATFORM, UI_VERSION, SYMBIAN_VERSION
+    
     if not RUNNING_SCONS:
         return
     
@@ -152,8 +154,6 @@ def _resolve_platform():
         mapping    = { "91" : (3,0), "92" : ( 3,1 ), "93" : ( 3.2 ) }        
         uiversion  = mapping[ "".join( symbian_version ) ]
         sdk_header = symbian_header
-    
-    global PLATFORM_HEADER, UI_PLATFORM, UI_VERSION, SYMBIAN_VERSION
     
     PLATFORM_HEADER = sdk_header
     UI_PLATFORM = uiplatform
