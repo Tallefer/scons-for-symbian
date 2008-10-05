@@ -3,27 +3,22 @@ __author__    = "Jussi Toivola"
 __license__   = "MIT License"
 
 import os
-import sys
-import textwrap
 from os.path import join, basename
 
-from SCons.Environment import Environment
 from SCons.Builder     import Builder
-from SCons.Options     import Options, EnumOption
 from SCons.Script      import Command, Copy, \
-                              Execute, Depends, BuildDir, \
+                              Depends, DefaultEnvironment, \
                               Install, Default, Mkdir, Clean
 
 from arguments import *
-import winscw
-import gcce
-import colorizer
-    
+import winscw, gcce, colorizer, symbian_pkg
+
 #: Handle to console for colorized output( and process launching )
 _OUTPUT_COLORIZER = colorizer.OutputConsole(  )
 
-# Set EPOCROOT as default target, so the stuff will actually be built.
+# Set EPOCROOT as default target, so the stuff will be built for emulator.
 Default( EPOCROOT )
+Default( "." )
     
 # TODO: freeze # perl -S /epoc32/tools/efreeze.pl %(FROZEN)s %(LIB_DEFS)s
 print "Building", COMPILER, RELEASE
@@ -45,11 +40,9 @@ def _create_environment( *args, **kwargs ):
         raise NotImplementedError( msg )
     return env
 
-def pkgname( sisname ):
-    "Convert sisname to pkg filename"
-    return ".".join( sisname.split(".")[:-1] + ["pkg"] )
-    
-def SymbianPackage( package, ensymbleargs = None, pkgargs = None, pkgfile=None, extra_files = None ):
+
+def SymbianPackage( package, ensymbleargs = None, pkgargs = None, 
+                    pkgfile=None, extra_files = None, source_package = None ):
     """
     Create Symbian Installer( sis ) file. Can use either Ensymble or pkg file.
     To enable creation, give command line arg: dosis=true
@@ -63,6 +56,9 @@ def SymbianPackage( package, ensymbleargs = None, pkgargs = None, pkgfile=None, 
     @param ensymbleargs: Arguments to Ensymble simplesis.
     @type ensymbleargs: dict 
     
+    @param source_package: Use data from another package for pkg generation.
+                           Equals to 'package' if None.
+        
     @param pkgfile: Path to pkg file.
     @type pkgfile: str
     @param extra_files: Copy files to package folder and install for simulator( to SIS with Ensymble only )
@@ -76,8 +72,11 @@ def SymbianPackage( package, ensymbleargs = None, pkgargs = None, pkgfile=None, 
         if ensymbleargs is None:
             ensymbleargs = {}
     
+    if source_package is None:
+        source_package = package
+        
     if extra_files is not None:
-        pkg = PKG_DATA.get( package, {} )
+        pkg = PKG_HANDLER.Package(package)
         
         for target, source in extra_files:
             pkg[source] = target
@@ -86,54 +85,15 @@ def SymbianPackage( package, ensymbleargs = None, pkgargs = None, pkgfile=None, 
             if COMPILER == COMPILER_WINSCW:
                 Install( join( FOLDER_EMULATOR_C, target ),   source )
         
-        PKG_DATA[package] = pkg
-        
     def create_pkg_file( pkgargs ):
         
         if pkgargs is None:
             pkgargs = {}
-            
-        def cmd( env, target = None, source = None ):
-            
-            print "Creating pkg", target[0]
-            
-            pkgfile = str(target[0])
-            f=open( pkgfile, 'w');
-            version = pkgargs.get("version", ( "1","0","00000" ) )
-            
-            files = PKG_DATA[package]
-            
-            header = '#{"%(appname)s"},(%(uid)s),' % ( pkgargs )
-            header += '%s,%s,%s' % tuple(version)
-            header += ',TYPE=%s\n\n' % pkgargs.get( "type", "SISSYSTEM" )
-            
-            f.write( ";Localised package name\n")
-            f.write( header )
-            
-            f.write( ";Localized vendor name\n")
-            f.write( '%%{"%s"}\n\n' % pkgargs.get( "vendor", "VENDOR" ) )
-            
-            f.write( ';Unique Vendor name\n' )
-            f.write( ':"%s"\n\n' % pkgargs.get( "vendor_id", "VENDOR" ) )
-            
-            ## TODO: Correct UID for UIQ    
-            f.write( '[0x101F7961], 0, 0, 0, {"Series60ProductID"}\n\n' )
-            keys = files.keys();keys.sort()
-            for x in keys:
-                t = files[x]
-                t = t.split("\\")
-                if t[0] == "any":
-                    t[0] = "!:"
-                else:
-                    t[0] = t[0]+":"
-                t = "\\".join( t ).replace("/","\\")
-                x = x.replace("/", "\\")
-                f.write( '%-50s - "%s"\n' % ( '"%s"' % x, t ) )
-            
-            f.close()
-        
-        Depends( package, pkgname( package ) )
-        return Command( pkgname( package ), None, cmd, ENV = os.environ )
+                
+        PKG_HANDLER.PackageArgs(package).update( pkgargs )
+        PKG_HANDLER.pkg_sis[pkgfile] = source_package
+        return Command( pkgfile, None, 
+                        PKG_HANDLER.GeneratePkg, ENV = os.environ )
     
     if pkgargs is not None and COMPILER != COMPILER_WINSCW:    
         create_pkg_file( pkgargs )
@@ -162,24 +122,53 @@ def SymbianPackage( package, ensymbleargs = None, pkgargs = None, pkgfile=None, 
             return Command( package, installed, ensymble, ENV = os.environ )
         
         elif pkgfile is not None:
-            cmd = "makesis %s %s" % ( pkgfile, package )
-            return Command( package, installed + [pkgfile], cmd, ENV = os.environ )
-            
+            return symbian_pkg.Makesis(pkgfile, package )
  
     if DO_CREATE_SIS:
         return create_install_file( [] )
 
-def SymbianHelp( *args  ):
+def SymbianHelp( source, uid, env = None  ):
+    """ Generate help files for Context Help
+    @param source: Help project file .cshlp"
+    @uid: UID of the application.
     
+    @return: generated .hlp and .hrh files.
+    @rtype: 2-tuple
+    """
     import cshlp
-    
-    helpresult = cshlp.CSHlp( *args )
+    if env is None:
+        env = DefaultEnvironment()
+        
+    helpresult = cshlp.CSHlp( DefaultEnvironment(), source, uid )
     return helpresult
     
+#: Holds the file source->target paths for each package
+#: This information is be used to generate the pkg file.
+PKG_HANDLER = symbian_pkg.PKGHandler()
 
-PKG_DATA = {}
-def ToPackage( env, package_drive_map, package, target, source ):
+def ToPackage( env = None, package_drive_map = None, package = None, 
+               target = None, source = None ):
+    """Insert file into package.
+    @param env: Environment. DefaultEnvironment() used if None.
+        
+    @param package_drive_map: Regular expression drive mapping. You can also
+                              tell the path directly on 'target', but do not
+                              use this then.
+    @rtype package_drive_map: dict
     
+    @param package: Package(.sis) to be used. Nothing done, if None.
+    @param target: Location on device
+    @param source: Source path of the file    
+    """
+    for attr in ["target","source"]:
+        notnone = locals()[attr]
+        if notnone is None:            
+            raise AttributeError("Error: '%s' is None." % attr )
+    
+    if env is None:
+        env = DefaultEnvironment()
+        
+    # Just skip this then    
     if package is None:
         return
         
@@ -187,7 +176,8 @@ def ToPackage( env, package_drive_map, package, target, source ):
     # WARNING: Copying to any/c/e is custom Ensymble feature.
     drive = ""
     
-    pkg = PKG_DATA.get(package, {} )
+    # Gets reference.
+    pkg = PKG_HANDLER.Package(package)
     
     if package_drive_map is not None:
             
@@ -208,11 +198,10 @@ def ToPackage( env, package_drive_map, package, target, source ):
     # Add to pkg generator
     pkgsource      = join( PACKAGE_FOLDER, package, drive, target, basename( source ) )
     pkg[pkgsource] = join( drive, target, basename( source ) )
-    env.Depends( pkgname(package), join( PACKAGE_FOLDER, package, pkg[pkgsource] )  )
+    env.Depends( symbian_pkg.GetPkgFilename(package), join( PACKAGE_FOLDER, package, pkg[pkgsource] )  )
     
     if drive == "":
-        pkg[pkgsource] = join( "any", target, basename( source ) )
-    PKG_DATA[package] = pkg
+        pkg[pkgsource] = join( "any", target, basename( source ) )    
     
     # Do the copy
     cmd = env.Install( join( PACKAGE_FOLDER, package, drive, target ), source )                      
@@ -230,7 +219,7 @@ def SymbianProgram( target, targettype = None,
                     # Sis stuff
                     package  = "",
                     package_drive_map = None,                 
-                    extra_depends=[],                 
+                    extra_depends     = None,                 
                     **kwargs ):
     """
     Main function for compiling Symbian software. Handles the whole process
@@ -334,8 +323,12 @@ def SymbianProgram( target, targettype = None,
     
     if defines is None:
         defines = []
-    defines = defines[:]
     
+    defines = defines[:] # Copy
+    
+    if extra_depends is None:
+        extra_depends = []    
+        
     if sysincludes is None:
         sysincludes = []
         
@@ -416,7 +409,7 @@ def SymbianProgram( target, targettype = None,
     env.BuildDir(OUTPUT_FOLDER, ".", duplicate=0 )
     
     if help:
-        helpresult = SymbianHelp( env, help, uid3 )
+        helpresult = SymbianHelp( help, uid3, env = env )
         if COMPILER == COMPILER_WINSCW:
             env.Install( join( FOLDER_EMULATOR_C, "resource", "help" ), helpresult[0] )
         
@@ -591,9 +584,6 @@ def SymbianProgram( target, targettype = None,
         output_lib    = ( targettype in DLL_TARGETTYPES )
         temp_dll_path = TARGET_RESULTABLE % ("._tmp_" + targettype )
         resultables = [ temp_dll_path ]
-
-        # GCCE uses .dso instead of .lib
-        LIBPATH   = gcce.SYMBIAN_ARMV5_LIBPATHDSO
         
         if output_lib:
             libname = target + ".dso"
@@ -629,7 +619,6 @@ def SymbianProgram( target, targettype = None,
 
         # Compile sources ------------------------------------------------------
         # Creates .lib
-        targetfile = target + "." + targettype
 
         def build_uid_cpp(target, source, env):
            """Create .UID.CPP for simulator"""
@@ -783,9 +772,9 @@ def SymbianProgram( target, targettype = None,
         
         # Combine with installfolder copying. TODO: Not needed anymore since EPOCROOT is default target.
         postcommands = []
-        copysource = TARGET_RESULTABLE % ( "."+targettype)
+        copysource      = TARGET_RESULTABLE % ( "."+targettype)
         target_filename = target + "." + targettype
-        sdkpath       = join( SDKFOLDER, target_filename )
+        sdkpath         = join( SDKFOLDER, target_filename )
 
         installed = []
         if COMPILER == COMPILER_WINSCW:

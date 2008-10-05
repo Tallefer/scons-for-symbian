@@ -9,7 +9,13 @@ from os.path import join
 
 from config import *
 
-from SCons.Script import ARGUMENTS, Options, DefaultEnvironment, EnumOption, Variables, EnumVariable, Help
+from SCons.Script import ARGUMENTS, Options, DefaultEnvironment, EnumOption
+from SCons.Script import HelpFunction as Help                         
+from SCons.Variables import Variables, EnumVariable                       
+
+#: Are we running a build? This is to avoid messing up code analyzers
+#: and Epydoc.
+RUNNING_SCONS = ( "scons" in sys.argv[0] )
 
 VARS = Variables('arguments.py')
 def GetArg( name, help, default, allowed_values = None, caseless=True ):
@@ -94,7 +100,9 @@ if not DO_CREATE_SIS:
     print "Info: SIS creation disabled"
 
 #: Constant for ui platform version
-UI_VERSION  = (3,0)
+UI_VERSION  = ( 3, 0 )
+#: Symbian version of the SDK 
+SYMBIAN_VERSION = ( 9 ,1 )
 
 #: SDK platform header( generated )
 #: S60 3rd & mr = EPOC32_INCLUDE + variant + symbian_os_v9.1.hrh
@@ -102,6 +110,9 @@ PLATFORM_HEADER = join( EPOC32_INCLUDE, "variant" )
 
 def _resolve_platform():    
     """Find out current SDK version"""
+    if not RUNNING_SCONS:
+        return
+    
     if not os.path.exists( PLATFORM_HEADER ):
         raise RuntimeError( "'%s' does not exist. Invalid EPOCROOT?" % PLATFORM_HEADER )
         
@@ -141,12 +152,15 @@ def _resolve_platform():
         mapping    = { "91" : (3,0), "92" : ( 3,1 ), "93" : ( 3.2 ) }        
         uiversion  = mapping[ "".join( symbian_version ) ]
         sdk_header = symbian_header
-        
-    return sdk_header, uiplatform,  \
-            tuple( uiversion ),     \
-            tuple( map( int, symbian_version ) )
     
-PLATFORM_HEADER, UI_PLATFORM, UI_VERSION, SYMBIAN_VERSION = _resolve_platform()
+    global PLATFORM_HEADER, UI_PLATFORM, UI_VERSION, SYMBIAN_VERSION
+    
+    PLATFORM_HEADER = sdk_header
+    UI_PLATFORM = uiplatform
+    UI_VERSION  = tuple( uiversion )
+    SYMBIAN_VERSION = tuple( map( int, symbian_version ) )
+    
+_resolve_platform()
           
 print "Info: Symbian OS version = %d.%d" % SYMBIAN_VERSION
 print "Info: UI platform        = %s"    % UI_PLATFORM, "%d.%d" % UI_VERSION
@@ -263,7 +277,7 @@ for _x in [ "-h", "-H", "--help"]:
 # Check if GCCE setup is correct
 if len( PATH_ARM_TOOLCHAIN) > 0:
     PATH_ARM_TOOLCHAIN = PATH_ARM_TOOLCHAIN[0]
-elif COMPILER == COMPILER_GCCE:
+elif COMPILER == COMPILER_GCCE and RUNNING_SCONS:
     print "\nERROR"
     print "-" * 79
     print "Error: Unable to find '%s' from path. GCCE building will fail." % CSL_ARM_TOOLCHAIN_FOLDER_NAME
@@ -279,13 +293,13 @@ def __winscw_in_path():
         return False 
     return True
     
-if not __winscw_in_path():
+if not __winscw_in_path() and RUNNING_SCONS:
     
     print "\nERROR"
     print "-" * 79
     print "WINSCW compiler 'mwccsym2.exe' not found from PATH." 
     print "Install Carbide and run configuration\\run_env_update.bat"
-    if not HELP_ENABLED:
+    if not HELP_ENABLED and RUNNING_SCONS:
         raise SystemExit(-1)      
    
 del _p

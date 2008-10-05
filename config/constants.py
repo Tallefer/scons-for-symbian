@@ -23,7 +23,8 @@ TARGETTYPES       = [ TARGETTYPE_DLL,
                       TARGETTYPE_PYD ]
 
 #: Types, which are compiled like dll( outputs lib )
-DLL_TARGETTYPES = [ TARGETTYPE_PLUGIN, TARGETTYPE_DLL, TARGETTYPE_PYD, TARGETTYPE_LIB ]
+DLL_TARGETTYPES = [ TARGETTYPE_PLUGIN, TARGETTYPE_DLL, 
+                    TARGETTYPE_PYD, TARGETTYPE_LIB ]
 
 #: Maps targettype to correct uid1
 TARGETTYPE_UID_MAP = {
