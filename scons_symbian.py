@@ -311,6 +311,12 @@ class SymbianProgramHandler(object):
     """Internal class for handling the SymbianProgram function call"""
     def __init__(self, **kwargs):
         
+        #: Compiler environment
+        self._env = None
+        self.target = None
+        self.extra_depends = None
+        self.sysincludes = None
+        
         # Store the keywords as instance attributes        
         for arg in kwargs:
             setattr( self, arg, kwargs[arg] )
@@ -318,22 +324,19 @@ class SymbianProgramHandler(object):
         #: Folder for compiler releasables.
         self.output_folder = get_output_folder( COMPILER, RELEASE, self.target, self.targettype )
         
-        #: Compiler environment
-        self._env = None
         
     def _isComponentEnabled(self):
         """Is the component enabled."""
         component_name = ".".join( [ self.target, self.targettype] ).lower()
         
         if COMPONENTS is not None:
-            for component in COMPONENTS:
-                inlist = ( component_name in COMPONENTS )
-                if inlist and not COMPONENTS_EXCLUDE:
-                    break
-                if not inlist and COMPONENTS_EXCLUDE:
-                    break
+            inlist = ( component_name in COMPONENTS )
+            if inlist and not COMPONENTS_EXCLUDE:
+                pass
+            elif not inlist and COMPONENTS_EXCLUDE:
+                pass
             else:
-                print "Symbian component", component_name, "ignored"                
+                print "Ignored Symbian component", component_name
                 return False
         
         print "Getting dependencies for", component_name
@@ -342,7 +345,9 @@ class SymbianProgramHandler(object):
     
     def _handleIcons(self):
         """Sets self.converted_icons"""   
+        #TODO: Create main interface SymbianIcon for generic icons
         
+        # Copy for emulator at the end using this list, just like binaries.
         self.converted_icons = []  
         
         if self.icons is None:
@@ -384,7 +389,63 @@ class SymbianProgramHandler(object):
                        
         self._env.Command( sdk_icons, icon_targets, copyres_cmds )
         self.converted_icons = sdk_icons            
+    
+    def _copyResultBinary(self):
+        """Copy the linked binary( exe, dll ) for emulator
+        and to resultables folder.
+        """
+        
+        env = self._env
+        installfolder = [ ]
+        
+        if self.targettype != TARGETTYPE_LIB:            
+            installfolder += ["sys", "bin" ]
+        else: # Don't install libs to device.
+            installfolder += ["lib"]
             
+        installfolder = join( *installfolder )
+        Mkdir( installfolder )
+        
+        installpath = join( installfolder, "%s.%s" % ( self.target, self.targettype ) )
+        
+        # Combine with installfolder copying. 
+        #TODO: Not needed anymore since EPOCROOT is default target.
+        postcommands = []
+        copysource = self._target_resultable % ( "." + self.targettype )
+        target_filename = self.target + "." + self.targettype
+        sdkpath = join( SDKFOLDER, target_filename )
+
+        installed = []
+        if COMPILER == COMPILER_WINSCW:
+            # Copy to SDK to be used with simulator
+            postcommands.append( Copy( sdkpath, copysource ) )
+            installed.append( sdkpath )
+
+        if self.output_libpath is not None and \
+        ( COMPILER == COMPILER_WINSCW or self.targettype == TARGETTYPE_LIB ):
+            s, t = self.output_libpath
+            postcommands.append( Copy( t, s ) )
+            installed.append( t )
+            
+        # Last to avoid copying to installpath if sdkfolder fails        
+        postcommands.append( Copy( installpath, copysource ) )
+        installed.append( installpath )
+        
+        returned_command = env.Command( installed, #IGNORE:W0612
+                                        copysource,
+                                        postcommands )
+        
+        if self.targettype != TARGETTYPE_LIB:
+            ToPackage( env, self.package_drive_map, self.package,
+                    installfolder,
+                    copysource )
+        else:  # Don't install libs to device.
+            ToPackage( env, None, None,
+                    "lib",
+                    copysource )
+                    
+        return installed
+        
     #TODO: Create main interface SymbianResource for special resource compiling
     def _convertResources( self ):
         """
@@ -451,7 +512,7 @@ class SymbianProgramHandler(object):
                            installfolder, converted_rsc )
 
                 # Copy to /epoc32/include/                
-                self._env.Install( includefolder, converted_rsg )
+                self._env.Install( includefolder, converted_rsg )#IGNORE:E1101
                 includepath = join( includefolder, "%s.%s" % ( rss_notype, "rsg" ) )
                 
                 # Add created header to be added for build dependency
@@ -478,11 +539,189 @@ class SymbianProgramHandler(object):
                     self._env.Depends( rss_path, prev_resource )
                 prev_resource = includepath                
     
+    def _handleGCCEBuild(self):
+        env = self._env
+        output_lib = ( self.targettype in DLL_TARGETTYPES )
+        temp_dll_path = self._target_resultable % ( "._tmp_" + self.targettype )
+        resultables = [ temp_dll_path ]
+        
+        if output_lib:
+            libname = self.target + ".dso"
+            self.output_libpath = ( EPOCROOT + r"epoc32/release/%s/%s/%s" % ( "armv5", "lib", libname ) )
+
+        build_prog = None
+        if self.targettype != TARGETTYPE_LIB:
+            build_prog = self._env.Program( resultables, self.sources )#IGNORE:E1101                
+            
+            # Depend on the libs
+            for libname in self.libraries:
+                env.Depends( build_prog, libname )
+                
+            # Mark the lib as a resultable also
+            resultables = [ self._target_resultable % ( "" ) ]
+            if output_lib:
+                resultables.append( self.output_libpath )
+
+            # Create final binary and lib/dso
+            self._env.Elf( resultables, temp_dll_path )#IGNORE:E1101
+
+        else:
+            build_prog = env.StaticLibrary( self._target_resultable % ".lib" , self.sources )#IGNORE:E1101
+            self.output_libpath = ( self._target_resultable % ".lib",
+                                EPOCROOT + r"epoc32/release/armv5/%s/%s.lib" % ( RELEASE, self.target ) )
+            
+        return build_prog
+            
+    def _handleWINSCWBuild(self):
+        # Compile sources ------------------------------------------------------
+        env = self._env
+        def build_uid_cpp( target, source, env ):#IGNORE:W0613
+            """Create .UID.CPP for simulator"""
+            template = ""
+            if self.targettype == TARGETTYPE_EXE:
+                template = winscw.TARGET_UID_CPP_TEMPLATE_EXE % { "UID3": self.uid3 }
+            else:
+                template = winscw.TARGET_UID_CPP_TEMPLATE_DLL
+
+            f = open( uid_cpp_filename, 'w' );f.write( template );f.close()
+            return None
+
+        # Create <target>.UID.CPP from template---------------------------------
+        uid_cpp_filename = self._target_resultable % ".UID.cpp"
+
+        bld = Builder( action = build_uid_cpp,
+                      suffix = '.UID.cpp' )
+        env.Append( BUILDERS = {'CreateUID' : bld} )
+        env.CreateUID( uid_cpp_filename, self.sources )#IGNORE:E1101
+
+        # We need to include the UID.cpp also
+        self.sources.append( uid_cpp_filename )
+
+        # Compile the sources. Create object files( .o ) and temporary dll.
+        output_lib = ( self.targettype in DLL_TARGETTYPES )
+        temp_dll_path = self._target_resultable % ( "._tmp_" + self.targettype )
+        resultables = [ temp_dll_path ]
+
+        if output_lib:
+            # No libs from exes
+            libname = self.target + ".lib"
+            resultable_path = self._target_resultable % "._tmp_lib"
+            resultables.append( resultable_path )
+            #resultables.append( self._target_resultable % ".inf" )
+            self.output_libpath = ( self._target_resultable % ".lib",
+                                join( EPOC32_RELEASE, libname ) )
+        
+        if self.targettype != TARGETTYPE_LIB:
+            build_prog = env.Program( resultables, self.sources )#IGNORE:E1101
+            # Depends on the used libraries. This has a nice effect since if,
+            # this project depends on one of the other projects/components/dlls/libs
+            # the depended project is automatically built first.
+            env.Depends( build_prog, [ join( EPOC32_RELEASE, libname ) for libname in self.libraries] )
+            
+        else:
+            build_prog = env.StaticLibrary( self._target_resultable % ".lib" , self.sources )#IGNORE:E1101
+            self.output_libpath = ( self._target_resultable % ".lib",
+                                join( EPOC32_RELEASE, "%s.lib" % ( self.target ) ) )
+        
+        if output_lib and self.targettype != TARGETTYPE_LIB:
+            # Create .inf file
+            definput = self.definput
+            if definput is not None:# and os.path.exists(definput):
+                definput = '-Frzfile "%s" ' % definput
+            else:
+                definput = ""
+
+            action = "\n".join( [
+                # Creates <target>.lib
+                'mwldsym2.exe -S -show only,names,unmangled,verbose -o "%s" "%s"' % ( self._target_resultable % ".inf", self._target_resultable % "._tmp_lib" ),
+                # Creates def file
+                r'perl -S %EPOCROOT%epoc32/tools/makedef.pl -absent __E32Dll ' + '-Inffile "%s" ' % ( self._target_resultable % ".inf" )
+ + definput
+ + ' "%s"' % ( self._target_resultable % '.def' ) ] )
+
+            defbld = Builder( action = action,
+                              ENV = os.environ )
+            env.Append( BUILDERS = {'Def' : defbld} )
+            env.Def( self._target_resultable % ".def", #IGNORE:E1101
+                     self._target_resultable % "._tmp_lib" )
+
+        # NOTE: If build folder is changed this does not work anymore.
+        # List compiled sources and add to dependency list
+        object_paths = [ ".".join( x.split( "." )[: - 1] ) + ".o" for x in self.sources ] #IGNORE:W0631
+        
+        # Sources depend on the headers generated from .rss files.
+        env.Depends( object_paths, self.resource_headers )
+
+        # Get the lookup folders from source paths.
+        object_folders = [ os.path.dirname( x ) for x in object_paths ]
+
+        # Needed to generate the --search [source + ".cpp" -> ".o",...] param
+        objects = [ os.path.basename( x ) for x in object_paths ]
+        objects = " ".join( objects )
+
+        libfolder = "%EPOCROOT%epoc32/release/winscw/udeb/"
+        libs = [ libfolder + x for x in self.libraries]
+    
+        if self.targettype in DLL_TARGETTYPES and self.targettype != TARGETTYPE_LIB:
+
+            env.Command( self._target_resultable % ( "." + self.targettype ), [ temp_dll_path, self._target_resultable % ".def" ],
+            [
+                " ".join( [
+                            'mwldsym2 -msgstyle gcc',
+                            '-stdlib %EPOCROOT%epoc32/release/winscw/udeb/edll.lib -noentry',
+                            '-shared -subsystem windows',
+                            '-g %s' % " ".join( libs ),
+                            '-o "%s"' % temp_dll_path,
+                            '-f "%s"' % ( self._target_resultable % ".def" ),
+                            '-implib "%s"' % ( self._target_resultable % ".lib" ),
+                            '-addcommand "out:%s.%s"' % ( self.target, self.targettype ),
+                            '-warnings off',
+                            '-l %s' % " -l ".join( set( object_folders ) ),
+                            '-search ' + objects,
+                          ]
+                        )
+            ]
+            )
+        elif self.targettype == TARGETTYPE_EXE:
+            env.Command( self._target_resultable % ".exe", temp_dll_path,
+                [
+                " ".join( [ 'mwldsym2',
+                            '-msgstyle gcc',
+                            '-stdlib %EPOCROOT%epoc32/release/winscw/udeb/eexe.lib',
+                            '-m "?_E32Bootstrap@@YGXXZ"',
+                            '-subsystem windows',
+                            '-g %s' % " ".join( libs ),
+                            '-o "$TARGET"',
+                            '-noimplib',
+                            '-l %s' % " -l ".join( set( object_folders ) ),
+                            '-search ' + objects,
+                          ]
+                        )
+                ]
+            )
+    
+        return build_prog
+    
+    def _handleHelp(self):
+        if not self.help:
+            return
+        
+        helpresult = SymbianHelp( self.help, self.uid3, env = self._env )
+        if COMPILER == COMPILER_WINSCW:
+            self._env.Install( join( FOLDER_EMULATOR_C, "resource", "help" ), helpresult[0] )#IGNORE:E1101
+        
+        ToPackage( self._env, self.package_drive_map, self.package,
+                    join( "resource", "help" ),
+                    helpresult[0] )
+        #
+        self.extra_depends.extend( helpresult )
+        
     def _handleMMP(self):
         import mmp_parser
-        p = mmp_parser.MMPParser( target )
+        p = mmp_parser.MMPParser( self.target )
         data = p.Parse()
         
+        #pylint: disable-msg=W0201
         self.target = data["target"]
         self.targettype = data["targettype"]
         self.sources = data["source"]        
@@ -493,16 +732,17 @@ class SymbianProgramHandler(object):
         self.uid3 = data["uid"][1]
         
         # Allow override in SConstruct
-        if capabilities is None:
+        if self.capabilities is None:
             self.capabilities = data["capability"]
         
         # Allow override in SConstruct
-        if rssdefines is None:
+        if self.rssdefines is None:
             self.rssdefines = data["macro"][:]
         
-        self._kwargs["defines"]       = data["macro"][:]
-        self._kwargs["allowdlldata"]  = data["epocallowdlldata"]
-        self._kwargs["epocstacksize"] = data["epocstacksize"]
+        self.defines       = data["macro"][:]
+        self.allowdlldata  = data["epocallowdlldata"]
+        self.epocstacksize = data["epocstacksize"]
+        #pylint: enable-msg=W0201
         
     def Process(self):
         
@@ -577,9 +817,8 @@ class SymbianProgramHandler(object):
         FOLDER_TARGET_TUPLE = ( self.output_folder, self.target )    
         Mkdir( self.output_folder )
         
-        
-        # Just give type of the file
-        TARGET_RESULTABLE = "%s/%s" % FOLDER_TARGET_TUPLE + "%s"
+        # Target resultable template. Just give extension of the file
+        self._target_resultable = "%s/%s" % FOLDER_TARGET_TUPLE + "%s"
         
         # Copy the modified keywords from self ignoring private 
         kwargs = {}
@@ -589,270 +828,49 @@ class SymbianProgramHandler(object):
             kwargs[x] = getattr( self, x )
                     
         self._env = _create_environment( **kwargs )
-        env       = self._env # legacy
         
         # Don't duplicate to ease use of IDE(Carbide)
         self._env.BuildDir( self.output_folder, ".", duplicate = 0 )
         
-        if self.help:
-            helpresult = SymbianHelp( self.help, self.uid3, env = self._env )
-            if COMPILER == COMPILER_WINSCW:
-                self._env.Install( join( FOLDER_EMULATOR_C, "resource", "help" ), helpresult[0] )#IGNORE:E1101
-            
-            ToPackage( env, self.package_drive_map, package,
-                        join( "resource", "help" ),
-                        helpresult[0] )
-            #
-            self.extra_depends.extend( self.helpresult )
+        #------------------------------------------------------- Generate help files
+        self._handleHelp()
     
         #-------------------------------------------------------------- Create icons
-        # Copy for emulator at the end using this list, just like binaries.
-        #TODO: Create main interface SymbianIcon for generic icons        
         self._handleIcons()                
         
         #---------------------------------------------------- Convert resource files 
         self._convertResources()
     
         # To be copied to /epoc32/release/WINSCW/UDEB/
-        output_libpath = None
-        returned_command = None
+        self.output_libpath = None
     
+        build_prog = None
+        #---------------------------------------------------------- Build using GCCE
         if COMPILER == COMPILER_GCCE:
-            output_lib = ( self.targettype in DLL_TARGETTYPES )
-            temp_dll_path = TARGET_RESULTABLE % ( "._tmp_" + self.targettype )
-            resultables = [ temp_dll_path ]
-            
-            if output_lib:
-                libname = self.target + ".dso"
-                output_libpath = ( EPOCROOT + r"epoc32/release/%s/%s/%s" % ( "armv5", "lib", libname ) )
-    
-            build_prog = None
-            if self.targettype != TARGETTYPE_LIB:
-                build_prog = env.Program( resultables, self.sources )#IGNORE:E1101                
-                
-                # Depend on the libs
-                for libname in self.libraries:
-                    env.Depends( build_prog, libname )
-                
-                # Todo: relocate. same with winscw
-                self._env.Depends( build_prog, self.converted_icons )
-                self._env.Depends( build_prog, self.converted_resources )
-                self._env.Depends( build_prog, self.resource_headers )
-    
-                # Mark the lib as a resultable also
-                resultables = [ TARGET_RESULTABLE % ( "" ) ]
-                if output_lib:
-                    resultables.append( output_libpath )
-    
-                # Create final binary and lib/dso
-                self._env.Elf( resultables, temp_dll_path )#IGNORE:E1101
-    
-            else:
-                build_prog = env.StaticLibrary( TARGET_RESULTABLE % ".lib" , self.sources )#IGNORE:E1101
-                output_libpath = ( TARGET_RESULTABLE % ".lib",
-                                    EPOCROOT + r"epoc32/release/armv5/%s/%s.lib" % ( RELEASE, self.target ) )
-            
-            #return
+            build_prog = self._handleGCCEBuild()
+        #-------------------------------------------------------- Build using WINSCW
         else:
-    
-            # Compile sources ------------------------------------------------------
-            # Creates .lib
-            def build_uid_cpp( target, source, env ):#IGNORE:W0613
-                """Create .UID.CPP for simulator"""
-                template = ""
-                if self.targettype == TARGETTYPE_EXE:
-                    template = winscw.TARGET_UID_CPP_TEMPLATE_EXE % { "UID3": self.uid3 }
-                else:
-                    template = winscw.TARGET_UID_CPP_TEMPLATE_DLL
-    
-                f = open( uid_cpp_filename, 'w' );f.write( template );f.close()
-                return None
-    
-            # Create <target>.UID.CPP from template---------------------------------
-            uid_cpp_filename = TARGET_RESULTABLE % ".UID.cpp"
-    
-            bld = Builder( action = build_uid_cpp,
-                          suffix = '.UID.cpp' )
-            env.Append( BUILDERS = {'CreateUID' : bld} )
-            env.CreateUID( uid_cpp_filename, self.sources )#IGNORE:E1101
-    
-            # We need to include the UID.cpp also
-            self.sources.append( uid_cpp_filename )
-    
-            # Compile the sources. Create object files( .o ) and temporary dll.
-            output_lib = ( self.targettype in DLL_TARGETTYPES )
-            temp_dll_path = TARGET_RESULTABLE % ( "._tmp_" + self.targettype )
-            resultables = [ temp_dll_path ]
-    
-            if output_lib:
-                # No libs from exes
-                libname = self.target + ".lib"
-                resultable_path = TARGET_RESULTABLE % "._tmp_lib"
-                resultables.append( resultable_path )
-                #resultables.append( TARGET_RESULTABLE % ".inf" )
-                output_libpath = ( TARGET_RESULTABLE % ".lib",
-                                    join( EPOC32_RELEASE, libname ) )
-            
-            if self.targettype != TARGETTYPE_LIB:
-                build_prog = env.Program( resultables, self.sources )#IGNORE:E1101
-                # Depends on the used libraries. This has a nice effect since if,
-                # this project depends on one of the other projects/components/dlls/libs
-                # the depended project is automatically built first.
-                
-                env.Depends( build_prog, [ join( EPOC32_RELEASE, libname ) for libname in self.libraries] )
-                env.Depends( build_prog, self.converted_icons )
-                env.Depends( build_prog, self.converted_resources )
-                env.Depends( build_prog, self.resource_headers )
-            else:
-                build_prog = env.StaticLibrary( TARGET_RESULTABLE % ".lib" , self.sources )#IGNORE:E1101
-                output_libpath = ( TARGET_RESULTABLE % ".lib",
-                                    join( EPOC32_RELEASE, "%s.lib" % ( self.target ) ) )
-            
-            if output_lib and self.targettype != TARGETTYPE_LIB:
-                # Create .inf file
-                definput = self.definput
-                if definput is not None:# and os.path.exists(definput):
-                    definput = '-Frzfile "%s" ' % definput
-                else:
-                    definput = ""
-    
-                action = "\n".join( [
-                    # Creates <target>.lib
-                    'mwldsym2.exe -S -show only,names,unmangled,verbose -o "%s" "%s"' % ( TARGET_RESULTABLE % ".inf", TARGET_RESULTABLE % "._tmp_lib" ),
-                    # Creates def file
-                    r'perl -S %EPOCROOT%epoc32/tools/makedef.pl -absent __E32Dll ' + '-Inffile "%s" ' % ( TARGET_RESULTABLE % ".inf" )
-     + definput
-     + ' "%s"' % ( TARGET_RESULTABLE % '.def' ) ] )
-    
-                defbld = Builder( action = action,
-                                  ENV = os.environ )
-                env.Append( BUILDERS = {'Def' : defbld} )
-                env.Def( TARGET_RESULTABLE % ".def", #IGNORE:E1101
-                         TARGET_RESULTABLE % "._tmp_lib" )
-    
-            # NOTE: If build folder is changed this does not work anymore.
-            # List compiled sources and add to dependency list
-            object_paths = [ ".".join( x.split( "." )[: - 1] ) + ".o" for x in self.sources ] #IGNORE:W0631
-            
-            # Sources depend on the headers generated from .rss files.
-            env.Depends( object_paths, self.resource_headers )
-    
-            # Get the lookup folders from source paths.
-            object_folders = [ os.path.dirname( x ) for x in object_paths ]
-    
-            # Needed to generate the --search [source + ".cpp" -> ".o",...] param
-            objects = [ os.path.basename( x ) for x in object_paths ]
-            objects = " ".join( objects )
-    
-            libfolder = "%EPOCROOT%epoc32/release/winscw/udeb/"
-            libs = [ libfolder + x for x in self.libraries]
+            build_prog = self._handleWINSCWBuild()
         
-            if self.targettype in DLL_TARGETTYPES and self.targettype != TARGETTYPE_LIB:
-    
-                env.Command( TARGET_RESULTABLE % ( "." + self.targettype ), [ temp_dll_path, TARGET_RESULTABLE % ".def" ],
-                [
-                    " ".join( [
-                                'mwldsym2 -msgstyle gcc',
-                                '-stdlib %EPOCROOT%epoc32/release/winscw/udeb/edll.lib -noentry',
-                                '-shared -subsystem windows',
-                                '-g %s' % " ".join( libs ),
-                                '-o "%s"' % temp_dll_path,
-                                '-f "%s"' % ( TARGET_RESULTABLE % ".def" ),
-                                '-implib "%s"' % ( TARGET_RESULTABLE % ".lib" ),
-                                '-addcommand "out:%s.%s"' % ( self.target, self.targettype ),
-                                '-warnings off',
-                                '-l %s' % " -l ".join( set( object_folders ) ),
-                                '-search ' + objects,
-                              ]
-                            )
-                ]
-                )
-            elif self.targettype == TARGETTYPE_EXE:
-                env.Command( TARGET_RESULTABLE % ".exe", temp_dll_path,
-                    [
-                    " ".join( [ 'mwldsym2',
-                                '-msgstyle gcc',
-                                '-stdlib %EPOCROOT%epoc32/release/winscw/udeb/eexe.lib',
-                                '-m "?_E32Bootstrap@@YGXXZ"',
-                                '-subsystem windows',
-                                '-g %s' % " ".join( libs ),
-                                '-o "$TARGET"',
-                                '-noimplib',
-                                '-l %s' % " -l ".join( set( object_folders ) ),
-                                '-search ' + objects,
-                              ]
-                            )
-                    ]
-                )
         
+        self._env.Depends( build_prog, self.converted_icons )
+        self._env.Depends( build_prog, self.converted_resources )
+        self._env.Depends( build_prog, self.resource_headers )
+
         for dep in self.extra_depends:
-            env.Depends( self.sources, dep )
-            env.Depends( build_prog, dep )
-            #env.Depends(object_paths, dep)
-            
-        def copy_result_binary():
-            """Copy the linked binary( exe, dll ) for emulator
-            and to resultables folder.
-            """
-            installfolder = [ ]
-            
-            if self.targettype != TARGETTYPE_LIB:            
-                installfolder += ["sys", "bin" ]
-            else: # Don't install libs to device.
-                installfolder += ["lib"]
-                
-            installfolder = join( *installfolder )
-            Mkdir( installfolder )
-            
-            installpath = join( installfolder, "%s.%s" % ( self.target, self.targettype ) )
-            
-            # Combine with installfolder copying. 
-            #TODO: Not needed anymore since EPOCROOT is default target.
-            postcommands = []
-            copysource = TARGET_RESULTABLE % ( "." + self.targettype )
-            target_filename = self.target + "." + self.targettype
-            sdkpath = join( SDKFOLDER, target_filename )
-    
-            installed = []
-            if COMPILER == COMPILER_WINSCW:
-                # Copy to SDK to be used with simulator
-                postcommands.append( Copy( sdkpath, copysource ) )
-                installed.append( sdkpath )
-    
-            if output_libpath is not None and \
-            ( COMPILER == COMPILER_WINSCW or self.targettype == TARGETTYPE_LIB ):
-                s, t = output_libpath
-                postcommands.append( Copy( t, s ) )
-                installed.append( t )
-                
-            # Last to avoid copying to installpath if sdkfolder fails        
-            postcommands.append( Copy( installpath, copysource ) )
-            installed.append( installpath )
-            
-            returned_command = env.Command( installed, #IGNORE:W0612
-                                            copysource,
-                                            postcommands )
-            
-            if self.targettype != TARGETTYPE_LIB:
-                ToPackage( env, self.package_drive_map, self.package,
-                        installfolder,
-                        copysource )
-            else:  # Don't install libs to device.
-                ToPackage( env, None, None,
-                        "lib",
-                        copysource )
-                        
-            return installed
+            self._env.Depends( self.sources, dep )
+            self._env.Depends( build_prog, dep )
         
-        installed = copy_result_binary()
-            
+        #-------------------------------------------------------------- Copy results
+        installed = self._copyResultBinary()
+        
         if self.package is not None and self.package != "" and self.targettype != TARGETTYPE_LIB:
             # package depends on the files anyway
-            env.Depends( self.package, installed )
+            self._env.Depends( self.package, installed )
         
         # Extra cleaning
         # It is easy to leave stuff with old names lying around 
         # and those are never cleaned otherwise
         Clean( build_prog, self.output_folder )
         
-        return returned_command
+        return build_prog

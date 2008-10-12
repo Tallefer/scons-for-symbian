@@ -15,15 +15,15 @@ import sys
 RUNNING_SCONS = ( "scons" in sys.argv[0] or "-c" == sys.argv[0] )
 
 VARS = Variables( 'arguments.py' )
-def GetArg( name, help, default, allowed_values = None, caseless = True ):
+def GetArg( name, helpmsg, default, allowed_values = None, caseless = True ):
     """Utility for adding help information and retrieving argument"""
     
     if allowed_values is not None:
-        VARS.Add( EnumVariable( name, help, default,
+        VARS.Add( EnumVariable( name, helpmsg, default,
                     allowed_values = allowed_values,
                     ignorecase = 2 ) )
     else:
-        VARS.Add( name, help, default )            
+        VARS.Add( name, helpmsg, default )            
     value = ARGUMENTS.get( name, default )
     if value is not None and caseless:
         value = value.lower()

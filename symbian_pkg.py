@@ -1,10 +1,8 @@
 """PKG generation and sis creation from pkg files"""
 
-from SCons.Script import Command, Depends #IGNORE:E1101
+from SCons.Script import Command
 import arguments
 import os
-#import codecs
-
 
 
 DEFAULT_PKG_TEMPLATE = """
@@ -87,7 +85,7 @@ class PKGHandler:
         
         print "Creating pkg", pkgfilename
         #f=codecs.open( pkgfilename, 'wb', encoding="utf-16le");
-        f = open( pkgfilename, 'w' );
+        f = open( pkgfilename, 'w' )
                 
         files = self.Package( package )
         pkgargs = self.PackageArgs( package )

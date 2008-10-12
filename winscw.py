@@ -37,18 +37,15 @@ def create_environment( target,
                         includes,
                         sysincludes,
                         libraries,
-                        uid2,
-                        uid3,
-                        definput = None,
-                        capabilities = None,
-                        defines = None,
+                        *args,
                         **kwargs  
                         ):
     """Create WINSCW environment
     @param kwargs: ignored keyword arguments.
     @see: L{scons_symbian.SymbianProgram}
     """
-
+    
+    defines = kwargs["defines"]
     for x in xrange( len( libraries ) ):
         lib = libraries[x]
         if "." not in lib:

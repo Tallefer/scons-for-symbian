@@ -6,12 +6,7 @@ This file is part of SCons for Symbian project.
 __author__    = "Jussi Toivola"
 __license__   = "MIT License"
 
-
-import os
-import sys
-from os.path import join, dirname, abspath, basename
-from relpath import relpath
-from arguments import COMPILER
+from os.path import join, dirname, basename
 
 def replace_tag( data, tag, value ):
     
@@ -46,8 +41,3 @@ def CSHlp( env, source, uid ):
     
     return [ result, result_hrh ]
         
-        
-if __name__ == "__main__":
-    
-    p = MMPParser( sys.argv[1] )
-    
