@@ -302,8 +302,8 @@ def SymbianProgram( target, targettype = None, #IGNORE:W0621
     """
     
     # Transforms arguments into keywords
-    kwargs = locals()
-    
+    kwargs.update( locals() )
+     
     handler = SymbianProgramHandler( **kwargs )
     return handler.Process()
 

@@ -52,6 +52,7 @@ def create_environment( target,
                         defines = None,
                         allowdlldata = True,
                         epocstacksize = None,
+						epocheapsize = None,
                         **kwargs ):
     """Create GCCE building environment
     @param allowdlldata: False to disable dll data support
@@ -59,7 +60,9 @@ def create_environment( target,
     
     @param epocstacksize: Size of stack for executable.
     @type  epocstacksize: int
-        
+    
+	@param epocheapsize: Minimum and maximum heap size
+	@type epocheapsize: 2-tuple( int, int )
     @param kwargs: ignored keyword arguments.
     @see: L{scons_symbian.SymbianProgram}
     """
@@ -75,6 +78,7 @@ def create_environment( target,
     LIBARGS = [ "-lsupc++", "-lgcc" ]
     LIBPATH = SYMBIAN_ARMV5_LIBPATHDSO
     
+    # GCCE uses .dso instead of .lib
     # Add .dso if file extension does not exist
     for x in xrange( len( libraries ) ):
         lib = libraries[x]
@@ -86,8 +90,6 @@ def create_environment( target,
         else:
             libraries[x] = SYMBIAN_ARMV5_LIBPATHLIB + lib
             
-    # GCCE uses .dso instead of .lib
-    #LIBRARIES = [ LIBPATH + x.lower().replace(".lib", ".dso") for x in libraries ]#+ ".dso"
     if targettype == TARGETTYPE_EXE:
         libraries.append( SYMBIAN_ARMV5_LIBPATHDSO + "eikcore.dso" )
     else:
@@ -118,24 +120,23 @@ def create_environment( target,
                     --target1-abs --no-undefined -nostdlib
                     -shared -Ttext 0x8000 -Tdata 0x400000
                     --default-symver
-                    -soname %(TARGET)s{%(UID2)s}[%(UID3)s].exe
                     """
     if targettype == TARGETTYPE_EXE:
         LINKFLAGS += """
-                    --entry _E32Startup  -u _E32Startup
+                    -soname %(TARGET)s{%(UID2)s}[%(UID3)s].exe
+                    --entry _E32Startup -u _E32Startup
+                    %(EPOCROOT)sepoc32/release/armv5/urel/eexe.lib
                     """
     else:
         LINKFLAGS += """
-                    --entry _E32Dll  -u _E32Dll
+                    -soname %(TARGET)s{%(UID2)s}[%(UID3)s].dll
+                    --entry _E32Dll -u _E32Dll
+                    %(EPOCROOT)sepoc32/release/armv5/urel/edll.lib
                     """
     
     LINKFLAGS += r"""
-                    %(EPOCROOT)sepoc32/release/armv5/urel/edll.lib
-                    -Map %(EPOCROOT)sepoc32/release/gcce/urel/%(TARGET)s.%(TARGETTYPE)s.map
-                    """
-
-    if targettype == TARGETTYPE_EXE:
-        LINKFLAGS = LINKFLAGS.replace( "edll.lib", "eexe.lib" )
+                  -Map %(EPOCROOT)sepoc32/release/gcce/urel/%(TARGET)s.%(TARGETTYPE)s.map
+                  """
 
     LINKFLAGS = textwrap.dedent( LINKFLAGS )
     LINKFLAGS = " ".join( [ x.strip() for x in LINKFLAGS.split( "\n" ) ] )
@@ -163,7 +164,12 @@ def create_environment( target,
     
     if epocstacksize is not None and targettype == TARGETTYPE_EXE:
         ELF2E32 += "--stack=" + "0x" + hex( epocstacksize ).replace( "0x", "" ).zfill( 8 )
-         
+    if epocheapsize is not None and targettype == TARGETTYPE_EXE:
+		assert type( epocheapsize ) == tuple, "epocheapsize must be 2-tuple( minsize, maxsize )"
+		min = hex( epocheapsize[0] ).replace("0x", "").zfill(8)
+		max = hex( epocheapsize[1] ).replace("0x", "").zfill(8)
+		ELF2E32 += " --heap=0x%s,0x%s " % ( min, max )
+		
     ELF2E32 = textwrap.dedent( ELF2E32 )
     ELF2E32 = " ".join( [ x.strip() for x in ELF2E32.split( "\n" ) ] )
 
