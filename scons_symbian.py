@@ -421,12 +421,13 @@ class SymbianProgramHandler(object):
             postcommands.append( Copy( sdkpath, copysource ) )
             installed.append( sdkpath )
 
-        if self.output_libpath is not None and \
-            COMPILER == COMPILER_WINSCW and \
-            self.targettype != TARGETTYPE_LIB:
-            s, t = self.output_libpath
-            postcommands.append( Copy( t, s ) )
-            installed.append( t )
+        if self.output_libpath is not None:
+            if (COMPILER == COMPILER_WINSCW and self.targettype != TARGETTYPE_LIB) or \
+                COMPILER == COMPILER_GCCE and self.targettype == TARGETTYPE_LIB :
+                
+                s, t = self.output_libpath
+                postcommands.append( Copy( t, s ) )
+                installed.append( t )
             
         # Last to avoid copying to installpath if sdkfolder fails
         #postcommands.append( Copy( installpath, copysource ) )
