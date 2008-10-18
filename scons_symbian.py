@@ -397,16 +397,16 @@ class SymbianProgramHandler(object):
         
         env = self._env
         installfolder = [ ]
-        
-        if self.targettype != TARGETTYPE_LIB:            
+
+        if self.targettype != TARGETTYPE_LIB:
             installfolder += ["sys", "bin" ]
         else: # Don't install libs to device.
             installfolder += ["lib"]
             
         installfolder = join( *installfolder )
-        Mkdir( installfolder )
+        #Mkdir( installfolder )
         
-        installpath = join( installfolder, "%s.%s" % ( self.target, self.targettype ) )
+        #installpath = join( installfolder, "%s.%s" % ( self.target, self.targettype ) )
         
         # Combine with installfolder copying. 
         #TODO: Not needed anymore since EPOCROOT is default target.
@@ -427,9 +427,9 @@ class SymbianProgramHandler(object):
             postcommands.append( Copy( t, s ) )
             installed.append( t )
             
-        # Last to avoid copying to installpath if sdkfolder fails        
-        postcommands.append( Copy( installpath, copysource ) )
-        installed.append( installpath )
+        # Last to avoid copying to installpath if sdkfolder fails
+        #postcommands.append( Copy( installpath, copysource ) )
+        #installed.append( installpath )
         
         returned_command = env.Command( installed, #IGNORE:W0612
                                         copysource,
@@ -521,18 +521,13 @@ class SymbianProgramHandler(object):
                 # _reg files copied to /epoc32/DATA/Z/private/10003a3f/apps/ on simulator
                 if COMPILER == COMPILER_WINSCW:
                     if "_reg" in rss_path.lower():
-                        path_private_simulator = EPOCROOT + r"epoc32/DATA/Z/private/10003a3f/apps/%s" % rsc_filename
-                        copy_file( converted_rsc, path_private_simulator )
-
-                        path_private_simulator = EPOCROOT + r"epoc32/release/winscw/udeb/z/private/10003a3f/apps/%s" % rsc_filename
-                        copy_file( converted_rsc, path_private_simulator )
+                        self._env.Install( join( EPOC32_DATA, "Z", "private","10003a3f","apps"), converted_rsc ) 
+                        self._env.Install( join( EPOC32_RELEASE, "Z", "private","10003a3f","apps"), converted_rsc )
 
                     else: # Copy normal resources to resource/apps folder
-                        path_resource_simulator = EPOCROOT + r"epoc32/DATA/Z/resource/apps/%s" % rsc_filename
-                        copy_file( converted_rsc, path_resource_simulator )
+                        self._env.Install( join( EPOC32_DATA, "Z", "resource","apps"), converted_rsc )
+                        self._env.Install( join( EPOC32_RELEASE, "Z", "resource", "apps"), converted_rsc )
 
-                        path_resource_simulator = EPOCROOT + r"epoc32/release/winscw/udeb/z/resource/apps/%s" % rsc_filename
-                        copy_file( converted_rsc, path_resource_simulator )
 
                 # Depend on previous. TODO: Use SCons Preprocessor scanner.
                 if prev_resource is not None:

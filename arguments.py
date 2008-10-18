@@ -35,6 +35,8 @@ print "EPOCROOT=%s" % EPOCROOT
 
 #: Constant pointing to EPOCROOT/epoc32
 EPOC32 = join( EPOCROOT, 'epoc32' )
+#: Constant pointing to sdk's data folder
+EPOC32_DATA = join( EPOC32, 'data' )
 #: Constant pointing to system include folder
 EPOC32_INCLUDE = join( EPOC32, 'include' )
 #: Constant pointing to system tools folder
@@ -62,7 +64,7 @@ if sys.platform == "linux2":
 #: Path to arm toolchain. Detected automatically from path using 'CSL Arm Toolchain' on Windows or csl-gcc on Linux
 PATH_ARM_TOOLCHAIN = [ _x for _x in _p.split( os.path.pathsep ) if CSL_ARM_TOOLCHAIN_FOLDER_NAME in _x ]
 
-        
+
 # Parse arguments -------------------------------------------------------------
 
 #: Used compiler
@@ -114,7 +116,7 @@ def _resolve_platform():
     
     if not os.path.exists( PLATFORM_HEADER ):
         raise RuntimeError( "'%s' does not exist. Invalid EPOCROOT?" % PLATFORM_HEADER )
-        
+
     # These are the same on S60
     sdk_header = ""
     symbian_header = ""
@@ -144,24 +146,34 @@ def _resolve_platform():
     if symbian_header == "": 
         raise RuntimeError( "Unknown platform. Invalid EPOCROOT?" )
     
-    symbian_version = symbian_header.split( "_v" )[1].split( "." )[:2]
-    
+
     if uiplatform == UI_PLATFORM_S60:
-        # 9.2 FP1, 9.3 FP2
-        mapping = { "91" : ( 3, 0 ), "92" : ( 3, 1 ), "93" : ( 3.2 ) }        
-        uiversion = mapping[ "".join( symbian_version ) ]
+        # Use manifest.xml to get version for all S60 SDKs
+        f = open( join( EPOC32, "kit", "manifest.xml" ) )
+        d = f.read()
+        f.close()
+        
+        symbian_version = d.split('osInfo version="')[-1].split('"')[0]
+        symbian_version = symbian_version.split(".")[:2]
+
+        uiversion = d.split('sdkVersion>')[1].split('<')[0]
+        uiversion = uiversion.split(".")[:2]
+
         sdk_header = symbian_header
+
+    else: #UIQ
+        symbian_version = symbian_header.split( "_v" )[1].split( "." )[:2]        
     
     PLATFORM_HEADER = sdk_header
     UI_PLATFORM = uiplatform
-    UI_VERSION = tuple( uiversion )
+    UI_VERSION = tuple( map( int, uiversion ) )
     SYMBIAN_VERSION = tuple( map( int, symbian_version ) )
-    
+
 _resolve_platform()
-          
+
 print "Info: Symbian OS version = %d.%d" % SYMBIAN_VERSION
 print "Info: UI platform        = %s" % UI_PLATFORM, "%d.%d" % UI_VERSION
-        
+
 #: Built components. One SConstruct can define multiple SymbianPrograms.
 #: This can be used from command-line to build only certain SymbianPrograms
 COMPONENTS = GetArg( "components", "Components to build. Separate with ','.", "all" )
@@ -186,7 +198,7 @@ COMPONENTS = __processComponents()
 def __get_defines():
     "Ensure correct syntax for defined strings"
     
-    tmp = GetArg( "defines", "Extra preprocessor defines. For debugging, etc.", None )
+    tmp = GetArg( "defines", "Extra preprocessor defines. For debugging, etc.", None, caseless=False )
     if tmp is None: return []
     tmp = tmp.split( "," )
 
@@ -224,13 +236,21 @@ DEFAULT_SYMBIAN_DEFINES = [ "__SYMBIAN32__",
                             "__SUPPORT_CPP_EXCEPTIONS__",
                           ]
 
-# Add S60 macros                             
+# Add S60 macros
 if UI_PLATFORM == UI_PLATFORM_S60:        
     DEFAULT_SYMBIAN_DEFINES += [ "__SERIES60_%d%d__" % UI_VERSION ]    
     DEFAULT_SYMBIAN_DEFINES += [ "__SERIES60_%dX__" % UI_VERSION[0] ]
+    
+    # Special rules for 5th edition
+    # __S60_3X__ and __SERIES60_3X__ are correct here
+    # TODO: Should these be read from e32plat.pl directly?
+    if UI_VERSION[0] == 5:
+        DEFAULT_SYMBIAN_DEFINES += ['__S60_50__','__S60_3X__','__SERIES60_3X__']
+
     # Not in regular build scripts
-    DEFAULT_SYMBIAN_DEFINES += [ "__SERIES60__" ]                           
-#Add UIQ macros    
+    DEFAULT_SYMBIAN_DEFINES += [ "__SERIES60__" ]
+
+#Add UIQ macros
 elif UI_PLATFORM == UI_PLATFORM_UIQ:
     # WARNING! These are not defined in regular UIQ build scripts
     # if you use these defines in your code, it becomes incompatible with them

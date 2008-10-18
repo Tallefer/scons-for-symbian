@@ -201,8 +201,16 @@ class OutputConsole( ConsoleBase ):
         external processes
         """
         #import pdb;pdb.set_trace()
-        args = [ subsitute_env_vars( x.replace( '"', '' ), env ) for x in args ]    
-        
+        #.replace( '"', '' )
+        #FIXME: the " must be removed but not those with \ before them.
+        tmp = []
+        for x in args:
+            x = x.replace(r'\"', '\???') # lets hope nobody wants to use \???
+            x = x.replace(r'"', '')
+            x = x.replace(r'\???', '"')
+            tmp.append( subsitute_env_vars( x, env ) )
+        args = tmp
+
         startupinfo = None
         if os.name == "nt":
             # Long command support <= 32766 for Windows

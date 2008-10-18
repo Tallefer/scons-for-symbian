@@ -23,7 +23,7 @@ DEFAULT_GCCE_DEFINES += [
                         "__MARM__",
                         "__EABI__",
                         "__MARM_ARMV5__",
-                        ( "__PRODUCT_INCLUDE__", '"%s"' % PLATFORM_HEADER )
+                        ( "__PRODUCT_INCLUDE__", r'\"%s\"' % PLATFORM_HEADER.replace("\\", "/") )
                         ]
 
 SYMBIAN_ARMV5_LIBPATH = [ EPOCROOT ] + "epoc32 release armv5".split()
