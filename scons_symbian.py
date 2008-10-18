@@ -422,7 +422,8 @@ class SymbianProgramHandler(object):
             installed.append( sdkpath )
 
         if self.output_libpath is not None and \
-        ( COMPILER == COMPILER_WINSCW or self.targettype == TARGETTYPE_LIB ):
+            COMPILER == COMPILER_WINSCW and \
+            self.targettype != TARGETTYPE_LIB:
             s, t = self.output_libpath
             postcommands.append( Copy( t, s ) )
             installed.append( t )
