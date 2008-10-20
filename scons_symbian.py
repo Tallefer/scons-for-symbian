@@ -57,7 +57,12 @@ def SymbianPackage( package, ensymbleargs = None, pkgargs = None,
     @param package: Name of the package.
     @type package: str
     
-    @param pkgargs: Arguments to PKG generation. Disabled if none, use empty dict for simple enable
+    @param pkgargs: Arguments to PKG generation. Disabled if none, use empty dict for simple enable.
+                    To enable signing, give at least both cert and keys, which point to the
+                    respective files. passwd key can be used for password.
+                    If pkgfile is not given, package name is converted to pkg extension and used instead.
+                    The signed sis file gets extension SIGNSIS_OUTPUT_EXTENSION defined in constants.py
+                    
     @type pkgargs: dict
     
     @param ensymbleargs: Arguments to Ensymble simplesis.
@@ -100,11 +105,14 @@ def SymbianPackage( package, ensymbleargs = None, pkgargs = None,
         
         PKG_HANDLER.PackageArgs( package ).update( pkgargs )
         PKG_HANDLER.pkg_sis[pkgfile] = source_package
-        return Command( pkgfile, None,
+        Command( pkgfile, None,
                         PKG_HANDLER.GeneratePkg, ENV = os.environ )
     
-    if pkgargs is not None and COMPILER != COMPILER_WINSCW:    
-        create_pkg_file( pkgargs )
+    if COMPILER != COMPILER_WINSCW:
+        if pkgargs is not None:     
+            if pkgfile is None:
+                pkgfile = symbian_pkg.GetPkgFilename(package)
+            create_pkg_file( pkgargs )
     
     def create_install_file( installed ):
         "Utility for creating an installation package using Ensymble"
@@ -131,7 +139,12 @@ def SymbianPackage( package, ensymbleargs = None, pkgargs = None,
             Command( package, installed, ensymble, ENV = os.environ )        
         
         elif pkgfile is not None:
-            return symbian_pkg.Makesis( pkgfile, package )
+            result = symbian_pkg.Makesis( pkgfile, package )
+            if "cert" in pkgargs and "key" in pkgargs:
+                sisx = package.split(".")
+                sisx = ".".join( sisx[:-1] ) + SIGNSIS_OUTPUT_EXTENSION
+                passwd = pkgargs.get( "passwd", "" )
+                result.append( symbian_pkg.SignSis( sisx, package, pkgargs["cert"], pkgargs["key"], passwd ) )
  
     if DO_CREATE_SIS:
         return create_install_file( [] )

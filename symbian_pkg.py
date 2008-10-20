@@ -1,6 +1,6 @@
 """PKG generation and sis creation from pkg files"""
 
-from SCons.Script import Command
+from SCons.Script import DefaultEnvironment
 import arguments
 import os
 
@@ -10,7 +10,7 @@ DEFAULT_PKG_TEMPLATE = """
 
 """
 
-def Makesis( pkgfile, package, installed = None, cert = None, key = None, passwd = "" ):
+def Makesis( pkgfile, package, installed = None, cert = None, key = None, passwd = "", env = None ):
     """
     Call makesis command line utility to create a sis package.
     
@@ -21,6 +21,7 @@ def Makesis( pkgfile, package, installed = None, cert = None, key = None, passwd
     @param passwd: Password used in signing
     
     """
+    if env is None: env = DefaultEnvironment()
     
     unsigned_package = package
     
@@ -37,15 +38,28 @@ def Makesis( pkgfile, package, installed = None, cert = None, key = None, passwd
         signsis = " ".join( [ "signsis", package, package, cert, key, passwd] )
         unsigned_package = "unsigned_" + unsigned_package
         
-        Command( package, unsigned_package, signsis, ENV = os.environ )
+        env.Command( package, unsigned_package, signsis, ENV = os.environ )
         output_files.append( unsigned_package )
     
     makesis = os.path.join( arguments.EPOC32_TOOLS, "makesis.exe" )
     makesis = ( "%s %s %s" % ( makesis, pkgfile, unsigned_package ) )
-    Command( unsigned_package, installed + [pkgfile],
+    env.Command( unsigned_package, installed + [pkgfile],
              makesis, ENV = os.environ )
     
     return output_files
+
+
+def SignSis(target, source, cert, key, passwd = "", env = None):
+    """ Call signsis command line utility to create a sis package.
+    
+    """
+    if env is None: env = DefaultEnvironment()
+    
+    signsis = os.path.join( arguments.EPOC32_TOOLS, "signsis.exe" )
+    signsis = ( "%s %s %s %s %s %s" % ( signsis, source, target, cert, key ,passwd ) )
+    env.Command( target, source, signsis, ENV = os.environ )
+    
+    return [target]
     
 def GetPkgFilename( sisname ):
     "Convert sisname to pkg filename"
@@ -72,7 +86,7 @@ class PKGHandler:
         
         self.pkg_args[package] = args  
         return args
-    
+     
     def GeneratePkg( self, target = None, source = None, env = None ):
         """ SCons Command to generate PKG file
         @param target: Contains the pkg filename
