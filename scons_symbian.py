@@ -93,7 +93,7 @@ def SymbianPackage( package, ensymbleargs = None, pkgargs = None,
         for target, source in extra_files:
             pkg[source] = target
             
-            ToPackage( DefaultEnvironment(), None, package, target, source )
+            ToPackage( DefaultEnvironment(), None, package, target, source, toemulator = False )
                     
             if COMPILER == COMPILER_WINSCW:
                 Install( join( FOLDER_EMULATOR_C, target ), source )
@@ -140,7 +140,9 @@ def SymbianPackage( package, ensymbleargs = None, pkgargs = None,
         
         elif pkgfile is not None:
             result = symbian_pkg.Makesis( pkgfile, package )
-            if "cert" in pkgargs and "key" in pkgargs:
+            cert = pkgargs.get("cert", None )
+            key  = pkgargs.get("key", None)
+            if cert and key:
                 sisx = package.split(".")
                 sisx = ".".join( sisx[:-1] ) + SIGNSIS_OUTPUT_EXTENSION
                 passwd = pkgargs.get( "passwd", "" )
@@ -169,7 +171,7 @@ def SymbianHelp( source, uid, env = None ):
 PKG_HANDLER = symbian_pkg.PKGHandler()
 
 def ToPackage( env = None, package_drive_map = None, package = None,
-               target = None, source = None ):
+               target = None, source = None, toemulator = True ):
     """Insert file into package.
     @param env: Environment. DefaultEnvironment() used if None.
         
@@ -179,7 +181,7 @@ def ToPackage( env = None, package_drive_map = None, package = None,
     @rtype package_drive_map: dict
     
     @param package: Package(.sis) to be used. Nothing done, if None.
-    @param target: Location on device
+    @param target: Folder on device
     @param source: Source path of the file    
     """
     for attr in ["target", "source"]:
@@ -227,7 +229,11 @@ def ToPackage( env = None, package_drive_map = None, package = None,
     
     # Do the copy
     cmd = env.Install( join( PACKAGE_FOLDER, package, drive, target ), source )  
-    Clean( cmd,join( PACKAGE_FOLDER, package) )                    
+    Clean( cmd,join( PACKAGE_FOLDER, package) )    
+       
+    if toemulator and COMPILER == COMPILER_WINSCW:
+        env.Install( join( FOLDER_EMULATOR_C, target ), source )
+        
     return cmd
 
 def SymbianProgram( target, targettype = None, #IGNORE:W0621
@@ -398,7 +404,7 @@ class SymbianProgramHandler(object):
             
             ToPackage( self._env, self.package_drive_map, self.package,
                 join( "resource", "apps" ),
-                tmp ) 
+                tmp, toemulator = False ) 
                        
         self._env.Command( sdk_icons, icon_targets, copyres_cmds )
         self.converted_icons = sdk_icons            
@@ -453,11 +459,11 @@ class SymbianProgramHandler(object):
         if self.targettype != TARGETTYPE_LIB:
             ToPackage( env, self.package_drive_map, self.package,
                     installfolder,
-                    copysource )
+                    copysource, toemulator = False )
         else:  # Don't install libs to device.
             ToPackage( env, None, None,
                     "lib",
-                    copysource )
+                    copysource, toemulator = False )
                     
         return installed
         
@@ -524,7 +530,7 @@ class SymbianProgramHandler(object):
                 rsc_filename = "%s.%s" % ( rss_notype, "rsc" )
                 # Copy to sis creation folder                
                 ToPackage( self._env, self.package_drive_map, self.package,
-                           installfolder, converted_rsc )
+                           installfolder, converted_rsc, toemulator = False )
 
                 # Copy to /epoc32/include/                
                 self._env.Install( includefolder, converted_rsg )#IGNORE:E1101
@@ -581,29 +587,32 @@ class SymbianProgramHandler(object):
                                 EPOCROOT + r"epoc32/release/armv5/%s/%s.lib" % ( RELEASE, self.target ) )
             
         return build_prog
+    
+    def _createUIDCPP( self, target, source, env ):#IGNORE:W0613
+        """Create .UID.CPP for simulator"""
+        template = ""
+        
+        if self.targettype == TARGETTYPE_EXE:
+            template = winscw.TARGET_UID_CPP_TEMPLATE_EXE % { "UID3": self.uid3 }
+        else:
+            template = winscw.TARGET_UID_CPP_TEMPLATE_DLL
+        
+        f = open( target[0].path, 'w' );f.write( template );f.close()
+        
+        return None
             
     def _handleWINSCWBuild(self):
         # Compile sources ------------------------------------------------------
         env = self._env
-        def build_uid_cpp( target, source, env ):#IGNORE:W0613
-            """Create .UID.CPP for simulator"""
-            template = ""
-            if self.targettype == TARGETTYPE_EXE:
-                template = winscw.TARGET_UID_CPP_TEMPLATE_EXE % { "UID3": self.uid3 }
-            else:
-                template = winscw.TARGET_UID_CPP_TEMPLATE_DLL
-
-            f = open( uid_cpp_filename, 'w' );f.write( template );f.close()
-            return None
-
+        
         # Create <target>.UID.CPP from template---------------------------------
         uid_cpp_filename = self._target_resultable % ".UID.cpp"
 
-        bld = Builder( action = build_uid_cpp,
+        bld = Builder( action = self._createUIDCPP,
                       suffix = '.UID.cpp' )
         env.Append( BUILDERS = {'CreateUID' : bld} )
         env.CreateUID( uid_cpp_filename, self.sources )#IGNORE:E1101
-
+        
         # We need to include the UID.cpp also
         self.sources.append( uid_cpp_filename )
 
@@ -717,8 +726,8 @@ class SymbianProgramHandler(object):
             return
         
         helpresult = SymbianHelp( self.help, self.uid3, env = self._env )
-        if COMPILER == COMPILER_WINSCW:
-            self._env.Install( join( FOLDER_EMULATOR_C, "resource", "help" ), helpresult[0] )#IGNORE:E1101
+        #if COMPILER == COMPILER_WINSCW:
+            #self._env.Install( join( FOLDER_EMULATOR_C, "resource", "help" ), helpresult[0] )#IGNORE:E1101
         
         ToPackage( self._env, self.package_drive_map, self.package,
                     join( "resource", "help" ),
@@ -820,7 +829,8 @@ class SymbianProgramHandler(object):
         #      explicit dependency!! Without self.output_folder the resulting object
         #      files are stored in the same folder as sources causing cross compiling
         #      to fail.
-        self.extra_depends.extend( self.sources )
+        # Seems to work again without. What is going on here? Updated scons 1.1?
+        #self.extra_depends.extend( self.sources )
         self.sources = [ join( self.output_folder, x ) for x in self.sources ]
         
         # This is often needed
