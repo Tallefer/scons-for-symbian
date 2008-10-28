@@ -81,6 +81,7 @@ LINECOUNTS = LineCounts()
 
 #: Original sys.stdout
 savedstdout = sys.stdout
+savedstderr = sys.stderr
 
 def subsitute_env_vars( line, env ):
     """ Substitutes environment variables in the command line.
@@ -112,11 +113,15 @@ def write( line, color ):
         try:
             CONSOLE.write_color( line, color )
             CONSOLE.write_color( "", CONSOLE.attr )
+            return
+        
         except TypeError:
             # Occurs at least when redirecting data to a file
             # So disable the color support
             CONSOLE = None
-            savedstdout.write( line )
+    
+    if color in [ Colors.ERROR, Colors.WARNING ]:
+        savedstderr.write( line )
     else:
         savedstdout.write( line )
         
@@ -144,16 +149,16 @@ class ConsoleBase( object ):
         """Read both stdout and stderr and output the data with colors"""
         block = None
         result = ""
-
+                
         while block != "":
-            block = self.savedstdout.readline()
+            block = self.savedstdout.read()
             self.write( block )
             result += block
 
-            block = self.savedstderr.readline()
+            block = self.savedstderr.read()
             self.write( block )
             result += block
-
+        
         return result
 
     def write( self, text ):
@@ -231,12 +236,13 @@ class OutputConsole( ConsoleBase ):
         if p.stdout is not None:
             while result is None:
                 # This is slow on Linux with Wine!!
-                line = p.stdout.readline()
+                line = p.stdout.read()
                 self.write( line )
                 result = p.poll()
-            # Get the last lines
+            # Get the last lines            
             line = p.stdout.readline()
             self.write( line )
+            
         else:
             result = p.wait()
             
