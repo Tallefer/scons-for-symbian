@@ -30,17 +30,7 @@ def Makesis( pkgfile, package, installed = None, cert = None, key = None, passwd
     
     output_files = []
     output_files.append( package ) # Always
-        
-    if cert is not None:
-        if key is None:
-            raise AttributeError( "key must be given for certificate" )
-        
-        signsis = " ".join( [ "signsis", package, package, cert, key, passwd] )
-        unsigned_package = "unsigned_" + unsigned_package
-        
-        env.Command( package, unsigned_package, signsis, ENV = os.environ )
-        output_files.append( unsigned_package )
-    
+         
     makesis = os.path.join( arguments.EPOC32_TOOLS, "makesis.exe" )
     makesis = ( "%s %s %s" % ( makesis, pkgfile, unsigned_package ) )
     env.Command( unsigned_package, installed + [pkgfile],

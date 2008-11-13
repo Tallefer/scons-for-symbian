@@ -1,5 +1,5 @@
 """
-SCons for Symbian
+SCons for Symbian aka S4S
 =================
 
 SCons for Symbian is a build toolchain intended as a replacement for Perl and 

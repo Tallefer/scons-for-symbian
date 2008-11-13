@@ -1,14 +1,7 @@
 """
 Main S4S module
 """
-
-__author__ = "Jussi Toivola"
-__license__ = "MIT License"
-
-# TODO: freeze # perl -S /epoc32/tools/efreeze.pl %(FROZEN)s %(LIB_DEFS)s
-
 #pylint: disable-msg=E0611
-
 from SCons.Builder import Builder
 from SCons.Script import (Command, Copy, DefaultEnvironment, Install, Mkdir, Clean, Default)
 from arguments import * #IGNORE:W0611
@@ -18,8 +11,14 @@ import gcce
 import os
 import symbian_pkg
 import winscw
-
+import rcomp
+import textwrap
 #pylint: enable-msg=E0611
+
+__author__ = "Jussi Toivola"
+__license__ = "MIT License"
+
+# TODO: freeze # perl -S /epoc32/tools/efreeze.pl %(FROZEN)s %(LIB_DEFS)s
 
 #: Handle to console for colorized output( and process launching )
 _OUTPUT_COLORIZER = colorizer.OutputConsole()
@@ -38,6 +37,7 @@ print "Defines", CMD_LINE_DEFINES
 def _create_environment( *args, **kwargs ):
     """Environment factory. Get correct environment for selected compiler."""
     env = None
+    
     if COMPILER == COMPILER_GCCE:
         env = gcce.create_environment( *args, **kwargs )
     elif COMPILER == COMPILER_WINSCW:
@@ -49,7 +49,8 @@ def _create_environment( *args, **kwargs ):
 
 
 def SymbianPackage( package, ensymbleargs = None, pkgargs = None,
-                    pkgfile = None, extra_files = None, source_package = None ):
+                    pkgfile = None, extra_files = None, source_package = None,
+                    env=None, startonboot = None ):
     """
     Create Symbian Installer( sis ) file. Can use either Ensymble or pkg file.
     To enable creation, give command line arg: dosis=true
@@ -73,12 +74,18 @@ def SymbianPackage( package, ensymbleargs = None, pkgargs = None,
         
     @param pkgfile: Path to pkg file.
     @type pkgfile: str
+    
+    @param startonboot: Name of the executable to be started on boot
+    @type startonboot: str
+    
     @param extra_files: Copy files to package folder and install for simulator( to SIS with Ensymble only )
     """                     
     # Skip processing to speed up help message                    
     if HELP_ENABLED: return
-
-    if ensymbleargs is not None and pkgfile is not None:
+    if not env:
+        env = DefaultEnvironment()
+        
+    if ensymbleargs is not None and pkgargs is not None:
         raise ValueError( "Trying to use both Ensymble and PKG file. Which one do you really want?" )
     else:
         if ensymbleargs is None:
@@ -105,15 +112,72 @@ def SymbianPackage( package, ensymbleargs = None, pkgargs = None,
         
         PKG_HANDLER.PackageArgs( package ).update( pkgargs )
         PKG_HANDLER.pkg_sis[pkgfile] = source_package
-        Command( pkgfile, None,
+        Command( pkgfile, PKG_HANDLER.pkg_files[package].keys(),
                         PKG_HANDLER.GeneratePkg, ENV = os.environ )
-    
+        
+        
     if COMPILER != COMPILER_WINSCW:
         if pkgargs is not None:     
             if pkgfile is None:
                 pkgfile = symbian_pkg.GetPkgFilename(package)
             create_pkg_file( pkgargs )
     
+    def __create_boot_up_resource( target, source, env):
+        """Create boot up resource file"""
+        # Notice that the resource must ALWAYS be copied to C:
+        template = r"""
+        #include <startupitem.rh>
+ 
+        RESOURCE STARTUP_ITEM_INFO startexe
+        {
+            executable_name = "c:\\sys\\bin\\%(APPNAME)s";
+            recovery = EStartupItemExPolicyNone;
+        }
+        """
+        
+        content = template % { "APPNAME" : startonboot }
+                
+        content = textwrap.dedent(content)
+        print content
+        
+        f = open( target[0].path, 'w' )
+        f.write(content)
+        f.close()
+    
+    
+    def _makeBootUpResource( ):
+        """Create resource file for starting executable on boot and compile it"""
+        
+        if not startonboot: return
+        
+        output_folder = get_output_folder( COMPILER, RELEASE, startonboot, "rss" )
+        
+        uid = PKG_HANDLER.PackageArgs(package)["uid"]
+        
+        uid = uid.replace("0x", "" )
+        
+        rssfilepath = join( output_folder, "[%s].rss" % uid )
+        env.Command( rssfilepath, None, __create_boot_up_resource )
+        
+        rscfilepath = join( output_folder, "[%s].rsc" % uid )
+        rsgfilepath = join( output_folder, "%s.rsg" % uid )
+        
+        rcomp.RComp( env, rscfilepath, rsgfilepath,
+                             rssfilepath,
+                             "-v -m045,046,047",
+                             SYSTEM_INCLUDES,
+                             [PLATFORM_HEADER],
+                             [ 'LANGUAGE_SC'])
+        
+        ToPackage(env, { "C" : ".*[.](rsc)" }, package, 
+                  "private/101f875a/import/", rscfilepath, toemulator=False)
+        
+        if COMPILER == COMPILER_WINSCW:
+            env.Install( join( EPOC32_DATA ), rscfilepath ) 
+    
+    #---------------------------------------------------- Create boot up API resource
+    _makeBootUpResource()
+                
     def create_install_file( installed ):
         "Utility for creating an installation package using Ensymble"
         from ensymble.cmd_simplesis import run as simplesis
@@ -139,17 +203,23 @@ def SymbianPackage( package, ensymbleargs = None, pkgargs = None,
             Command( package, installed, ensymble, ENV = os.environ )        
         
         elif pkgfile is not None:
-            result = symbian_pkg.Makesis( pkgfile, package )
+            result = symbian_pkg.Makesis( pkgfile, 
+                                          package, 
+                                          installed = PKG_HANDLER.pkg_files[package].keys() )
+                        
             cert = pkgargs.get("cert", None )
             key  = pkgargs.get("key", None)
             if cert and key:
                 sisx = package.split(".")
-                sisx = ".".join( sisx[:-1] ) + SIGNSIS_OUTPUT_EXTENSION
+                sisx = ".".join( sisx[:-1] ) + SIGNSIS_OUTPUT_EXTENSION                
+                env.Depends( sisx, package )
+                env.Depends( sisx, PKG_HANDLER.pkg_files[package].keys() + result )
+                
                 passwd = pkgargs.get( "passwd", "" )
                 result.append( symbian_pkg.SignSis( sisx, package, pkgargs["cert"], pkgargs["key"], passwd ) )
  
     if DO_CREATE_SIS:
-        return create_install_file( [] )
+        return create_install_file( PKG_HANDLER.Package(package).keys() )
 
 def SymbianHelp( source, uid, env = None ):
     """ Generate help files for Context Help
@@ -183,6 +253,8 @@ def ToPackage( env = None, package_drive_map = None, package = None,
     @param package: Package(.sis) to be used. Nothing done, if None.
     @param target: Folder on device
     @param source: Source path of the file    
+    @param toemulator: Flag to determine if the file is installed for SDK's emulator.
+    
     """
     for attr in ["target", "source"]:
         notnone = locals()[attr]
@@ -239,6 +311,7 @@ def ToPackage( env = None, package_drive_map = None, package = None,
 def SymbianProgram( target, targettype = None, #IGNORE:W0621
                     sources = None, includes = None,
                     libraries = None, uid2 = None, uid3 = None,
+                    sid = None,
                     definput = None, capabilities = None,
                     icons = None, resources = None,
                     rssdefines = None,
@@ -271,6 +344,9 @@ def SymbianProgram( target, targettype = None, #IGNORE:W0621
     
     @param sysincludes:  List of folders to be used for finding system headers.
     @type sysincludes: list
+    
+    @param sid: Secure id. Defaults to uid3.
+    @type sid: str/hex
     
     @param definput:    Path to .def file containing frozen library entrypoints.
     @type definput: str
@@ -335,7 +411,7 @@ class SymbianProgramHandler(object):
         self.target = None
         self.extra_depends = None
         self.sysincludes = None
-        
+                
         # Store the keywords as instance attributes        
         for arg in kwargs:
             setattr( self, arg, kwargs[arg] )
@@ -466,7 +542,7 @@ class SymbianProgramHandler(object):
                     copysource, toemulator = False )
                     
         return installed
-        
+ 
     #TODO: Create main interface SymbianResource for special resource compiling
     def _convertResources( self ):
         """
@@ -479,9 +555,7 @@ class SymbianProgramHandler(object):
             -> epoc32/release/winscw/udeb/z/private/10003a3f/apps/
             -> epoc32/DATA/Z/private/10003a3f/apps/
         .RSG     -> epoc32/include/
-        """
-        
-        import rcomp
+        """            
         
         self.converted_resources = []
         self.resource_headers    = []
@@ -593,7 +667,8 @@ class SymbianProgramHandler(object):
         template = ""
         
         if self.targettype == TARGETTYPE_EXE:
-            template = winscw.TARGET_UID_CPP_TEMPLATE_EXE % { "UID3": self.uid3 }
+            template = winscw.TARGET_UID_CPP_TEMPLATE_EXE % { "UID3": self.uid3,
+                                                              "SID" : self.sid }
         else:
             template = winscw.TARGET_UID_CPP_TEMPLATE_DLL
         
@@ -767,7 +842,7 @@ class SymbianProgramHandler(object):
         
         # Skip processing to speed up help message
         if HELP_ENABLED: return
-    
+        
         if self.target.lower().endswith( ".mmp" ):
             self._handleMMP()
         
@@ -800,6 +875,7 @@ class SymbianProgramHandler(object):
         if self.capabilities is None:
             self.capabilities = FREE_CAPS
         
+        # Handle UIDs
         if self.uid2 is None:
             if self.targettype == TARGETTYPE_EXE:
                 self.uid2 = "0x100039ce"
@@ -808,11 +884,19 @@ class SymbianProgramHandler(object):
         
         if self.uid3 is None:
             self.uid3 = "0x0"
+        elif type(self.uid3) != str:             
+            self.uid3 = hex(self.uid3)[:-1]
+        
+        if not self.sid:
+            self.sid = self.uid3                            
+        elif type(self.sid) != str:
+            self.sid = hex(self.sid)[:-1]
         
         # Add macros to ease changing application UID
         self.uiddefines = [
             "__UID3__=%s" % self.uid3
         ]
+        
         self.defines.extend( self.uiddefines )
         
         if self.rssdefines is None:
@@ -860,7 +944,7 @@ class SymbianProgramHandler(object):
         
         #---------------------------------------------------- Convert resource files 
         self._convertResources()
-    
+        
         # To be copied to /epoc32/release/WINSCW/UDEB/
         self.output_libpath = None
     

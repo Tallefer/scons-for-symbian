@@ -7,55 +7,112 @@ __author__ = "Jussi Toivola"
 __license__ = "MIT License"
 
 #TODO: Preprocess the mmp file
-from os.path import join, abspath
+from os.path import join, abspath, dirname
 from relpath import relpath
 import os
 import sys
 
-KEYWORDS = ( "target", "targettype", "library", "source", "systeminclude", "userinclude",
+KEYWORDS = ("target", "targettype", "library", "source", "systeminclude", "userinclude",
               "staticlibary", "epocallowdlldata", "macro", "capability", "epocstacksize",
               "resources", "uid"
             )
-                                         
+
+class MMPData(object):
+    def __init__(self):
+        self.EPOCSTACKSIZE = 0
+        self.EPOCHEAPSIZE = 0
+        self.SOURCE = []
+        self.LIBRARY = []
+        self.RESOURCE = []
+        self.UID2 = ""
+        self.UID3 = ""
+        self.TARGETTYPE = ""
+        self.SYSTEMINCLUDE = []
+        self.USERINCLUDE = []
+        self.EPOCALLOWDLLDATA = False
+        self.CAPABILITY = []
+        
+class MMPExporter(object):
+    def __init__(self, targetpath):
+        self.TargetPath = targetpath
+        self.TargetDir = dirname(targetpath)
+        self.MMPData = MMPData()
+        
+    def Export(self):
+        attrs = [ x for x in dir(self.MMPData) if x.isupper() ]
+        
+        result = []
+        result.append("TARGET %s.%s" % (self.MMPData.TARGET, self.MMPData.TARGETTYPE) )
+        result.append("UID %s %s" % ( self.MMPData.UID2, self.MMPData.UID3 ) )
+        
+        attrs.remove("TARGET")
+        if self.MMPData.EPOCALLOWDLLDATA:
+            result.append("EPOCALLOWDLLDATA")        
+        attrs.remove("EPOCALLOWDLLDATA")
+        
+        if self.MMPData.EPOCHEAPSIZE == 0:
+            attrs.remove("EPOCHEAPSIZE")
+        if self.MMPData.EPOCSTACKSIZE == 0:
+            attrs.remove("EPOCSTACKSIZE")
+        
+        attrs.remove("UID2")
+        attrs.remove("UID3")
+        for a in attrs:
+            data = getattr(self.MMPData, a)
+            if type(data) == list:
+                if a == "CAPABILITY":
+                    #for item in data:
+                    result.append( "CAPABILITY %s" % " ".join( self.MMPData.CAPABILITY ) )
+                else:    
+                    for item in data:
+                        if a == "LIBRARY":
+                            item += ".lib"
+                        result.append("%s %s" % (a, item))
+            else:
+                result.append("%s %s" % (a, data))
+                
+                
+        return "\n".join(result)
+    
 class MMPParser:
     """Parse MMP to be built with SCons for Symbian"""
-    def __init__( self, sourcefile ):
+    def __init__(self, sourcefile):
         #: Path to the MMP file.
         self.Source = sourcefile
         
-    def Parse( self ):
-        f = open( self.Source )
+    def Parse(self):
+        f = open(self.Source)
         lines = f.readlines()
         f.close()
         
-        workingfolder = os.path.dirname( self.Source )
+        workingfolder = os.path.dirname(self.Source)
         sourcepath = workingfolder
-        curdir = abspath( os.curdir )
+        curdir = abspath(os.curdir)
         
-        lines = [x for x in lines if len( x.strip() ) > 0 ]        
+        lines = [x for x in lines if len(x.strip()) > 0 ]        
         
         result = {}
         # initialize
         for x in KEYWORDS:
             result[x] = []
         result["epocallowdlldata"] = False # Not enabled with regular scripts either
-        result["epocstacksize"].append( hex( 8 * 1024 ) )
+        result["epocstacksize"].append(hex(8 * 1024))
         result["uid"] += [ None, None]
         for line in lines:                        
             parts = line.split()
             keyword = parts[0].lower()
             if keyword in KEYWORDS:
-                items = result.get( keyword, [] )                
-                if len( parts ) > 1:
+                items = result.get(keyword, [])                
+                if len(parts) > 1:
                     if keyword == "source":
                         files = []
-                        files = [ join( sourcepath, x ) for x in parts[1:] ]
+                        files = [ join(sourcepath, x) for x in parts[1:] ]
                         items += files
                     elif keyword == "library":
-                        libs = [ x.replace( ".lib", "" ) for x in parts[1:] ]
+                        libs = [ x.lower().replace(".lib", "") for x in parts[1:] ]
                         items += libs
                     elif keyword in [ "systeminclude", "userinclude"]:
-                        items += [ join( workingfolder, x ) for x in parts[1:] ] 
+                        items += [ join(workingfolder, x) for x in parts[1:] ] 
                     else:
                         items += parts[1:]
                 else:
@@ -65,22 +122,30 @@ class MMPParser:
                 result[keyword] = items
                 
             elif keyword == "sourcepath":
-                sourcepath = join( sourcepath, parts[1] )
-                sourcepath = relpath( curdir, abspath( sourcepath ) )
+                sourcepath = join(sourcepath, parts[1])
+                sourcepath = relpath(curdir, abspath(sourcepath))
                 print "Curdir:", sourcepath
                 
             elif keyword == "start":
-                result["resources"] += [ join( sourcepath, parts[ - 1] ) ]
+                result["resources"] += [ join(sourcepath, parts[ - 1]) ]
                 result["userinclude"] += [ sourcepath ]
         
         # Take targettype from file extension instead. TODO: special dlls.
-        result["targettype"] = result["target"][0].split( "." )[ - 1]
-        result["target"] = ".".join( result["target"][0].split( "." )[: - 1] ) # Strip extension
-        result["epocstacksize"] = int( result["epocstacksize"][0], 16 )
+        result["targettype"] = result["target"][0].split(".")[ - 1]
+        result["target"] = ".".join(result["target"][0].split(".")[: - 1]) # Strip extension
+        result["epocstacksize"] = int(result["epocstacksize"][0], 16)
         return result
 
 if __name__ == "__main__":
     import pprint
-    p = MMPParser( sys.argv[1] )
+    p = MMPParser(sys.argv[1])
+    mmpdata = p.Parse()
+    pprint.pprint(mmpdata)
     
-    pprint.pprint( p.Parse() )
+    e = MMPExporter("test.mmp")
+    for x in mmpdata:
+        if x == "uid": continue
+        setattr(e.MMPData, x.upper(), mmpdata[x])
+    
+    print e.Export()
+    

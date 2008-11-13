@@ -47,14 +47,17 @@ def create_environment( target,
                         libraries,
                         uid2,
                         uid3,
+                        sid = None,
                         definput = None,
                         capabilities = None,
                         defines = None,
                         allowdlldata = True,
                         epocstacksize = None,
 						epocheapsize = None,
+                        gcce_options = None,
                         **kwargs ):
-    """Create GCCE building environment
+    """Create GCCE building environment    
+    
     @param allowdlldata: False to disable dll data support
     @type  allowdlldata: bool
     
@@ -67,6 +70,11 @@ def create_environment( target,
     @see: L{scons_symbian.SymbianProgram}
     """
     
+    
+    
+    if gcce_options is None:
+        gcce_options = GCCE_OPTIMIZATION_FLAGS
+        
     if targettype in DLL_TARGETTYPES:
         defines.append( "__DLL__" )
     else:
@@ -149,7 +157,7 @@ def create_environment( target,
     
     #--vid=0x00000000
     ELF2E32 = r"""
-                %(EPOCROOT)sepoc32/tools/elf2e32 --sid=%(UID3)s
+                %(EPOCROOT)sepoc32/tools/elf2e32 --sid=%(SID)s
                 --uid1=%(UID1)s --uid2=%(UID2)s --uid3=%(UID3)s
                 --capability=%(CAPABILITIES)s
                 --fpu=softvfp --targettype=%(TARGETTYPE)s
@@ -198,11 +206,6 @@ def create_environment( target,
         
         uid1 = TARGETTYPE_UID_MAP[TARGETTYPE_DLL]#"0x10000079" # DLL
     
-    #if len( sysincludes ) > 0:
-    #    sysincludes = "-I " + " -I ".join( sysincludes )
-    #else:
-    #    sysincludes = " "
-        
     env = Environment ( 
                     tools = ["mingw"], # Disable searching of tools
                     ENV = os.environ,
@@ -216,7 +219,7 @@ def create_environment( target,
                     CFLAGS = WARNINGS_C + " -x c -include " + COMPILER_INCLUDE,
                     
                     CXX = r'arm-none-symbianelf-g++',
-                    CXXFLAGS = WARNINGS_CXX + " " + GCCE_OPTIMIZATION_FLAGS + " -x c++ -include %s " % ( COMPILER_INCLUDE ),
+                    CXXFLAGS = WARNINGS_CXX + " " + gcce_options + " -x c++ -include %s " % ( COMPILER_INCLUDE ),
                     
                     # isystem does not work so just adding the system include paths before normal includes.
                     CPPPATH = sysincludes + includes,
@@ -253,6 +256,7 @@ def create_environment( target,
                           "UID1"        : uid1,
                           "UID2"        : uid2,
                           "UID3"        : uid3,
+                          "SID"         : sid,
                           "DEFCONFIG"   : defconfig }
  
     elf2e32_builder = Builder( action = elf2e32_cmd.replace( "\\", "/" ),
