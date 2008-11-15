@@ -94,6 +94,9 @@ class PKGHandler:
         files = self.Package( package )
         pkgargs = self.PackageArgs( package )
         
+        if type( pkgargs["uid"] ) != str:
+            pkgargs["uid"] = hex( pkgargs["uid"] ).replace("L","")
+        
         version = pkgargs["version"]
         
         header = '#{"%(appname)s"},(%(uid)s),' % ( pkgargs )
