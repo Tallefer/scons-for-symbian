@@ -41,7 +41,7 @@ if CONSOLE is not None:
 #: Lines containing these strings are drawn in Colors.ERROR color
 KEYWORD_ERRORS = [ __x.lower() for __x in [ "error:", " error ", "failed", " undefined ", "does not match", "illegal",
                "was expected", "The process cannot access",
-               "No such file or directory", "*** "
+               "No such file or directory", "*** ", "cannot be opened",
                "Cannot convert", "needed by", "explicit dependency" ] ]
 KEYWORD_ERRORS.sort()
 

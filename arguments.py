@@ -231,36 +231,40 @@ SDKFOLDER = os.path.join( EPOCROOT,
                 )
 
 #: Default Symbian definitions.
-DEFAULT_SYMBIAN_DEFINES = [ "__SYMBIAN32__",
-                            "_UNICODE",
-                            "__SUPPORT_CPP_EXCEPTIONS__",
-                          ]
+STANDARD_DEFINES = [ "__SYMBIAN32__",
+                     "_UNICODE",
+                     "__SUPPORT_CPP_EXCEPTIONS__",
+                   ]
 
 # Add S60 macros
+EXTRA_DEFINES = []
 if UI_PLATFORM == UI_PLATFORM_S60:        
-    DEFAULT_SYMBIAN_DEFINES += [ "__SERIES60_%d%d__" % UI_VERSION ]    
-    DEFAULT_SYMBIAN_DEFINES += [ "__SERIES60_%dX__" % UI_VERSION[0] ]
+    STANDARD_DEFINES += [ "__SERIES60_%d%d__" % UI_VERSION ]    
+    STANDARD_DEFINES += [ "__SERIES60_%dX__" % UI_VERSION[0] ]
     
     # Special rules for 5th edition
     # __S60_3X__ and __SERIES60_3X__ are correct here
     # TODO: Should these be read from e32plat.pl directly?
     if UI_VERSION[0] == 5:
-        DEFAULT_SYMBIAN_DEFINES += ['__S60_50__','__S60_3X__','__SERIES60_3X__']
+        STANDARD_DEFINES += ['__S60_50__','__S60_3X__','__SERIES60_3X__']
 
     # Not in regular build scripts
-    DEFAULT_SYMBIAN_DEFINES += [ "__SERIES60__" ]
+    EXTRA_DEFINES += [ "__SERIES60__" ]
+    
 
 #Add UIQ macros
 elif UI_PLATFORM == UI_PLATFORM_UIQ:
     # WARNING! These are not defined in regular UIQ build scripts
     # if you use these defines in your code, it becomes incompatible with them
     # You'll need to add these in your MMP with MACRO    
-    DEFAULT_SYMBIAN_DEFINES += [ "__UIQ_%d%d__" % UI_VERSION ]
-    DEFAULT_SYMBIAN_DEFINES += [ "__UIQ_%dX__" % UI_VERSION[0] ]
-    DEFAULT_SYMBIAN_DEFINES += [ "__UIQ__" ]
+    EXTRA_DEFINES += [ "__UIQ_%d%d__" % UI_VERSION ]
+    EXTRA_DEFINES += [ "__UIQ_%dX__" % UI_VERSION[0] ]
+    EXTRA_DEFINES += [ "__UIQ__" ]
 
-DEFAULT_SYMBIAN_DEFINES += [ "__SYMBIAN_OS_VERSION__=%d%d" % SYMBIAN_VERSION ]
-DEFAULT_SYMBIAN_DEFINES += [ "__UI_VERSION__=%d%d" % UI_VERSION ]
+EXTRA_DEFINES += [ "__SYMBIAN_OS_VERSION__=%d%d" % SYMBIAN_VERSION ]
+EXTRA_DEFINES += [ "__UI_VERSION__=%d%d" % UI_VERSION ]
+
+DEFAULT_SYMBIAN_DEFINES = STANDARD_DEFINES + EXTRA_DEFINES
                                             
 if RELEASE == RELEASE_UREL:
     DEFAULT_SYMBIAN_DEFINES.append( "NDEBUG" )

@@ -12,6 +12,8 @@ from relpath import relpath
 import os
 import sys
 
+from config.constants import *
+
 KEYWORDS = ("target", "targettype", "library", "source", "systeminclude", "userinclude",
               "staticlibary", "epocallowdlldata", "macro", "capability", "epocstacksize",
               "resources", "uid"
@@ -31,21 +33,50 @@ class MMPData(object):
         self.USERINCLUDE = []
         self.EPOCALLOWDLLDATA = False
         self.CAPABILITY = []
-        
+        self.SOURCEPATH = ["."]
+        self.MACRO = []
+        self.RESOURCE = ""
+
+TEMPLATE_RESOURCE = r"""
+START RESOURCE    %(RESOURCE)s
+HEADER
+TARGETPATH resource\apps
+END
+"""
+
+TEMPLATE_RESOURCE_REG = r"""
+START RESOURCE    %(RESOURCE)s
+#ifdef WINSCW
+TARGETPATH       \private\10003a3f\apps
+#else
+TARGETPATH       \private\10003a3f\import\apps
+#endif
+END
+"""
 class MMPExporter(object):
     def __init__(self, targetpath):
         self.TargetPath = targetpath
         self.TargetDir = dirname(targetpath)
         self.MMPData = MMPData()
+        self.MMPContents = ""
         
     def Export(self):
         attrs = [ x for x in dir(self.MMPData) if x.isupper() ]
-        
+        #import pdb;pdb.set_trace()
         result = []
-        result.append("TARGET %s.%s" % (self.MMPData.TARGET, self.MMPData.TARGETTYPE) )
-        result.append("UID %s %s" % ( self.MMPData.UID2, self.MMPData.UID3 ) )
+        targettype = self.MMPData.TARGETTYPE
+        if targettype in [ TARGETTYPE_PLUGIN, 
+                           TARGETTYPE_DLL, 
+                           TARGETTYPE_PYD ]:
+            targettype = TARGETTYPE_DLL
+            
+        result.append("TARGET     %s.%s" % (self.MMPData.TARGET, self.MMPData.TARGETTYPE) )
+        result.append("TARGETTYPE %s" % (targettype) )
+        result.append("UID        %s %s" % ( self.MMPData.UID2, self.MMPData.UID3 ) )
         
         attrs.remove("TARGET")
+        attrs.remove("TARGETTYPE")
+        
         if self.MMPData.EPOCALLOWDLLDATA:
             result.append("EPOCALLOWDLLDATA")        
         attrs.remove("EPOCALLOWDLLDATA")
@@ -57,22 +88,68 @@ class MMPExporter(object):
         
         attrs.remove("UID2")
         attrs.remove("UID3")
+        
+        attrs.remove("CAPABILITY")
+        attrs.append("CAPABILITY")
+        
+        data = self.MMPData
+        #import pdb;pdb.set_trace()
+        #data.USERINCLUDE = ["."] + [ relpath(self.TargetDir, x ) for x in data.USERINCLUDE ]
+        for x in xrange(len(data.USERINCLUDE) ):
+            #print data.USERINCLUDE[x]
+            #import pdb;pdb.set_trace()
+            if not os.path.isabs( data.USERINCLUDE[x] ):
+                try:
+                    data.USERINCLUDE[x] = relpath(self.TargetDir, data.USERINCLUDE[x] )
+                except TypeError:
+                    data.USERINCLUDE[x] = "." 
+                    pass # if same
+                            
+        #data.SYSTEMINCLUDE = [ relpath(self.TargetDir, x ) for x in data.SYSTEMINCLUDE ]
+        
+        order = [ "MACRO", "SYSTEMINCLUDE", "USERINCLUDE", "SOURCEPATH", "RESOURCE", "SOURCE", "LIBRARY"]
+        for o in order:
+            if o in attrs:
+                attrs.remove(o)
+        attrs = order + attrs
+        
         for a in attrs:
+            result.append("") # Separate sections with empty line
+            
             data = getattr(self.MMPData, a)
             if type(data) == list:
                 if a == "CAPABILITY":
                     #for item in data:
-                    result.append( "CAPABILITY %s" % " ".join( self.MMPData.CAPABILITY ) )
+                    result.append( "%-11s %s" % ( "CAPABILITY", " ".join( self.MMPData.CAPABILITY ) ) )
+                elif a == "SOURCE":
+                    #import pdb;pdb.set_trace()
+                    for s in data:
+                        rpath = relpath(self.TargetDir, s )
+                        result.append( "%-11s %s" % ( "SOURCE", rpath ) )
+                elif a == "RESOURCE":
+                    for s in data:
+                        template = TEMPLATE_RESOURCE
+                        if "_reg" in s.lower():
+                            template = TEMPLATE_RESOURCE_REG
+                        s = relpath(self.TargetDir, s )
+                        res = template % {"RESOURCE" : s }
+                        result.append( res )
+                                                       
                 else:    
                     for item in data:
-                        if a == "LIBRARY":
-                            item += ".lib"
-                        result.append("%s %s" % (a, item))
-            else:
-                result.append("%s %s" % (a, data))
-                
-                
-        return "\n".join(result)
+                        result.append("%-11s %s" % (a, item))
+            elif data:
+                result.append("%-11s %s" % (a, data))
+        
+        result.append( "EXPORTUNFROZEN")
+                                    
+        self.MMPContents = "\n".join(result).replace("/", "\\")
+        return self.MMPContents
+    
+    def Save(self):
+        f = open( self.TargetPath, 'w')
+        f.write( self.MMPContents )
+        f.close()
     
 class MMPParser:
     """Parse MMP to be built with SCons for Symbian"""

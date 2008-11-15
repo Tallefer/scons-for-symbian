@@ -6,6 +6,7 @@ from SCons.Builder import Builder
 from SCons.Script import (Command, Copy, DefaultEnvironment, Install, Mkdir, Clean, Default)
 from arguments import * #IGNORE:W0611
 from os.path import join, basename
+import mmp_parser
 import colorizer
 import gcce
 import os
@@ -318,6 +319,7 @@ def SymbianProgram( target, targettype = None, #IGNORE:W0621
                     defines = None,
                     help = None,
                     sysincludes = None,
+                    mmpexport = None,
                     # Sis stuff
                     package = "",
                     package_drive_map = None,
@@ -347,6 +349,9 @@ def SymbianProgram( target, targettype = None, #IGNORE:W0621
     
     @param sid: Secure id. Defaults to uid3.
     @type sid: str/hex
+    
+    @param mmpexport: Path to the generated MMP
+    @type mmpexport: str
     
     @param definput:    Path to .def file containing frozen library entrypoints.
     @type definput: str
@@ -411,7 +416,7 @@ class SymbianProgramHandler(object):
         self.target = None
         self.extra_depends = None
         self.sysincludes = None
-                
+        self.origsources = [] # Sources not altered for BuildDir        
         # Store the keywords as instance attributes        
         for arg in kwargs:
             setattr( self, arg, kwargs[arg] )
@@ -845,7 +850,7 @@ class SymbianProgramHandler(object):
         
         if self.target.lower().endswith( ".mmp" ):
             self._handleMMP()
-        
+           
         if self.includes is None:
             self.includes = []
         
@@ -915,6 +920,7 @@ class SymbianProgramHandler(object):
         #      to fail.
         # Seems to work again without. What is going on here? Updated scons 1.1?
         #self.extra_depends.extend( self.sources )
+        self.origsources = self.sources[:]
         self.sources = [ join( self.output_folder, x ) for x in self.sources ]
         
         # This is often needed
@@ -968,6 +974,41 @@ class SymbianProgramHandler(object):
         #-------------------------------------------------------------- Copy results
         installed = self._copyResultBinary()
         
+        #---------------------------------------------------------------- Export MMP
+        if self.mmpexport is not None:
+            exporter = mmp_parser.MMPExporter( self.mmpexport )
+            data = exporter.MMPData
+            
+            data.TARGET = self.target
+            #import pdb;pdb.set_trace()
+            data.TARGETTYPE = self.targettype
+            #import pdb;pdb.set_trace()
+            defines = self.defines[:] + EXTRA_DEFINES
+            #for d in STANDARD_DEFINES:
+            #    if d in defines:
+            #        defines.remove(d)
+            if hasattr( self, "epocstacksize" ):
+                data.EPOCSTACKSIZE = self.epocstacksize
+            if hasattr( self, "epocheapsize" ):
+                data.EPOCHEAPSIZE  = self.epocheapsize
+                
+            if self.resources:
+                data.RESOURCE = self.resources[:]
+                        
+            data.MACRO   = defines
+            data.SOURCE  = self.origsources[:]
+            data.LIBRARY = self.libraries[:]
+            data.UID2    = self.uid2.replace("L","")
+            data.UID3    = self.uid3.replace("L","")
+            data.CAPABILITY = self.capabilities[:]
+            data.USERINCLUDE.extend( self.includes )
+            data.SYSTEMINCLUDE = self.sysincludes[:]
+            #import pdb;pdb.set_trace()
+            exporter.Export()
+            exporter.Save()
+            
+            print( "Info: MMP exported '%s'" % self.mmpexport )
+            
         if self.package is not None and self.package != "" and self.targettype != TARGETTYPE_LIB:
             # package depends on the files anyway
             self._env.Depends( self.package, installed )

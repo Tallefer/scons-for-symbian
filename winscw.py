@@ -45,7 +45,7 @@ def create_environment( target,
     @see: L{scons_symbian.SymbianProgram}
     """
     
-    defines = kwargs["defines"]
+    defines = kwargs["defines"][:]
     for x in xrange( len( libraries ) ):
         lib = libraries[x]
         if "." not in lib:
