@@ -416,7 +416,8 @@ class SymbianProgramHandler(object):
         self.target = None
         self.extra_depends = None
         self.sysincludes = None
-        self.origsources = [] # Sources not altered for BuildDir        
+        self.origsources = [] # Sources not altered for BuildDir
+        self.origlibraries = []        
         # Store the keywords as instance attributes        
         for arg in kwargs:
             setattr( self, arg, kwargs[arg] )
@@ -873,7 +874,8 @@ class SymbianProgramHandler(object):
         
         if self.libraries is None:
             self.libraries = []
-            
+        self.origlibraries = self.libraries[:]
+        
         if CMD_LINE_LIBS is not None:
             self.libraries.extend( CMD_LINE_LIBS )
         
@@ -997,7 +999,7 @@ class SymbianProgramHandler(object):
                         
             data.MACRO   = defines
             data.SOURCE  = self.origsources[:]
-            data.LIBRARY = self.libraries[:]
+            data.LIBRARY = [ x + ".lib" for x in self.origlibraries ]
             data.UID2    = self.uid2.replace("L","")
             data.UID3    = self.uid3.replace("L","")
             data.CAPABILITY = self.capabilities[:]

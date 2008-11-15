@@ -71,6 +71,7 @@ def create_environment( target,
     """
     
     
+    defines = defines[:]
     
     if gcce_options is None:
         gcce_options = GCCE_OPTIMIZATION_FLAGS
