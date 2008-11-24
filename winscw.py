@@ -20,7 +20,7 @@ TARGET_UID_CPP_TEMPLATE_DLL = r"""
 // scons-generated uid source file
 #include <e32cmn.h>
 #pragma data_seg(".SYMBIAN")
-__EMULATOR_IMAGE_HEADER2(0x10000079,0x00000000,0x00000000,EPriorityForeground,0x000ff1b4u,0x00000000u,0x00000000,0,0x00010000,0)
+__EMULATOR_IMAGE_HEADER2(0x10000079,0x00000000,0x00000000,EPriorityForeground,%(CAPABILITIES)su,0x00000000u,0x00000000,0,0x00010000,0)
 #pragma data_seg()
 """
 #: UID.cpp for WINSCW simulator
@@ -28,9 +28,42 @@ TARGET_UID_CPP_TEMPLATE_EXE = r"""
 // scons-generated uid source file
 #include <e32cmn.h>
 #pragma data_seg(".SYMBIAN")
-__EMULATOR_IMAGE_HEADER2(0x1000007a,0x100039ce,%(UID3)s,EPriorityForeground,0x000ff1b4u,0x00000000u,%(SID)s,0x00000000,0x00010000,0)
+__EMULATOR_IMAGE_HEADER2(0x1000007a,0x100039ce,%(UID3)s,EPriorityForeground,%(CAPABILITIES)su,0x00000000u,%(SID)s,0x00000000,0x00010000,0)
 #pragma data_seg()
 """
+
+
+CAPABILITY_MAP = {
+        "NONE" : 0,
+        "TCB" : (1<<0),
+        "COMMDD" :                 (1<<1),
+        "POWERMGMT" :             (1<<2),
+        "MULTIMEDIADD" :             (1<<3),
+        "READDEVICEDATA" :         (1<<4),
+        "WRITEDEVICEDATA" :         (1<<5),
+        "DRM" :                     (1<<6),
+        "TRUSTEDUI" :             (1<<7),
+        "PROTSERV" :                 (1<<8),
+        "DISKADMIN" :             (1<<9),
+        "NETWORKCONTROL" :         (1<<10),
+        "ALLFILES" :                 (1<<11),
+        "SWEVENT" :                 (1<<12),
+        "NETWORKSERVICES" :         (1<<13),
+        "LOCALSERVICES" :         (1<<14),
+        "READUSERDATA" :             (1<<15),
+        "WRITEUSERDATA" :         (1<<16),
+        "LOCATION" :                 (1<<17),
+        "SURROUNDINGSDD" :         (1<<18),
+        "USERENVIRONMENT" :         (1<<19),                  
+                  
+}
+
+def make_capability_hex(capabilities):
+    result = 0
+    for cap in capabilities:
+        val = CAPABILITY_MAP[cap.upper()]
+        result += val
+    return "0x" + hex(result)[2:].zfill(8)
                         
 def create_environment( target,
                         targettype,

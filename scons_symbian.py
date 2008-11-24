@@ -668,15 +668,17 @@ class SymbianProgramHandler(object):
             
         return build_prog
     
+    # TODO: Move to winscw.py
     def _createUIDCPP( self, target, source, env ):#IGNORE:W0613
         """Create .UID.CPP for simulator"""
         template = ""
-        
+        capabilities = winscw.make_capability_hex( self.capabilities )
         if self.targettype == TARGETTYPE_EXE:
             template = winscw.TARGET_UID_CPP_TEMPLATE_EXE % { "UID3": self.uid3,
-                                                              "SID" : self.sid }
+                                                              "SID" : self.sid,
+                                                              "CAPABILITIES": capabilities }
         else:
-            template = winscw.TARGET_UID_CPP_TEMPLATE_DLL
+            template = winscw.TARGET_UID_CPP_TEMPLATE_DLL % { "CAPABILITIES": capabilities }
         
         f = open( target[0].path, 'w' );f.write( template );f.close()
         
@@ -686,16 +688,25 @@ class SymbianProgramHandler(object):
         # Compile sources ------------------------------------------------------
         env = self._env
         
-        # Create <target>.UID.CPP from template---------------------------------
-        uid_cpp_filename = self._target_resultable % ".UID.cpp"
-
-        bld = Builder( action = self._createUIDCPP,
-                      suffix = '.UID.cpp' )
-        env.Append( BUILDERS = {'CreateUID' : bld} )
-        env.CreateUID( uid_cpp_filename, self.sources )#IGNORE:E1101
-        
-        # We need to include the UID.cpp also
-        self.sources.append( uid_cpp_filename )
+        if self.targettype != TARGETTYPE_LIB:        
+            # Create <target>.UID.CPP from template---------------------------------
+            uid_cpp_filename = self._target_resultable % ".UID.cpp"
+            #self._createUIDCPP( [env.File( uid_cpp_filename)], None, env )
+            
+            # TODO: Move to winscw.py
+            bld = Builder( action = self._createUIDCPP,
+                          suffix = '.UID.cpp',
+                          caps = self.capabilities )
+            env.Append( BUILDERS = {'CreateUID' : bld} )
+            env.CreateUID( uid_cpp_filename, self.sources )#IGNORE:E1101        
+            
+            # uid.cpp depends on the value of the capabilities
+            import SCons.Node.Python
+            caps_value = env.Value(self.capabilities)
+            env.Depends( uid_cpp_filename, caps_value )
+            
+            # We need to include the UID.cpp also
+            self.sources.append( uid_cpp_filename )
 
         # Compile the sources. Create object files( .o ) and temporary dll.
         output_lib = ( self.targettype in DLL_TARGETTYPES )
