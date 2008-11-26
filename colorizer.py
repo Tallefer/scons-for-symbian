@@ -95,20 +95,22 @@ def subsitute_env_vars( line, env ):
         line = line.replace( "%%%s%%" % key, value )
     return line
     
+def _handle_posix_write(line,color):
+    msg = "%02i" % color
+    savedstdout.write( "\x1b[%sm" % ( msg ) )
+    savedstdout.write( line )
+    
+    # Reset
+    msg = "%02i" % 0
+    savedstdout.write( "\x1b[%sm" % ( msg ) )
+
 def write( line, color ):
     """Write line with color"""
     global CONSOLE
 
-    if os.name == "posix":
-
-        msg = "%02i" % color
-        savedstdout.write( "\x1b[%sm" % ( msg ) )
-        savedstdout.write( line )
-        
-        # Reset
-        msg = "%02i" % 0
-        savedstdout.write( "\x1b[%sm" % ( msg ) )
-
+    if os.name == "posix":        
+        return _handle_posix_write( line, color )  
+    
     elif CONSOLE is not None:
         try:
             CONSOLE.write_color( line, color )
