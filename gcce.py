@@ -242,8 +242,10 @@ def create_environment( target,
     
     # Add GCC binaries to path head, so we are sure to use them instead of some other (Cygwin, Carbide)
     # TODO: Windows specific
-    env.PrependENVPath( 'PATH', 'C:\\Program Files\\CSL Arm Toolchain\\libexec\\gcc\\arm-none-symbianelf\\3.4.3' )
-    env.PrependENVPath( 'PATH', 'C:\\Program Files\\CSL Arm Toolchain\\arm-none-symbianelf\\bin' )     
+    # Commented out... these really don't belong here. 
+    # What if somebody uses different path or another GCCE compiler version?... like I do.
+    #env.PrependENVPath( 'PATH', 'C:\\Program Files\\CSL Arm Toolchain\\libexec\\gcc\\arm-none-symbianelf\\3.4.3' )
+    #env.PrependENVPath( 'PATH', 'C:\\Program Files\\CSL Arm Toolchain\\arm-none-symbianelf\\bin' )     
 
     # Add special builders------------------------------------------------------
 

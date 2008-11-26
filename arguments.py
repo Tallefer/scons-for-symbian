@@ -57,13 +57,13 @@ else:
     os.environ["EPOCROOT"] = EPOCROOT
 
 _p = os.environ["PATH"]
-CSL_ARM_TOOLCHAIN_FOLDER_NAME = "CSL Arm Toolchain\\bin"
-if sys.platform == "linux2":
-    CSL_ARM_TOOLCHAIN_FOLDER_NAME = "csl-gcc/bin"
+#CSL_ARM_TOOLCHAIN_FOLDER_NAME = "CSL Arm Toolchain\\bin"
+#if sys.platform == "linux2":
+#    CSL_ARM_TOOLCHAIN_FOLDER_NAME = "csl-gcc/bin"
     
 #: Path to arm toolchain. Detected automatically from path using 'CSL Arm Toolchain' on Windows or csl-gcc on Linux
-PATH_ARM_TOOLCHAIN = [ _x for _x in _p.split( os.path.pathsep ) if CSL_ARM_TOOLCHAIN_FOLDER_NAME in _x ]
-
+#PATH_ARM_TOOLCHAIN = [ _x for _x in _p.split( os.path.pathsep ) if CSL_ARM_TOOLCHAIN_FOLDER_NAME in _x ]
+    
 
 # Parse arguments -------------------------------------------------------------
 
@@ -80,6 +80,9 @@ PACKAGE_FOLDER = join( "%s_%s" % ( COMPILER, RELEASE ), "packages" )
 GCCE_OPTIMIZATION_FLAGS = GetArg( "gcce_options", "GCCE compiler options.",
                                     GCCE_OPTIMIZATION_FLAGS,
                                     caseless = False )
+
+MMP_EXPORT_ENABLED = GetArg( "mmpexport", "Enable MMP export(if configured).", "false", [ "true", "false"] )
+MMP_EXPORT_ENABLED = MMP_EXPORT_ENABLED == "true"
 
 DO_CREATE_SIS = GetArg( "dosis", "Create SIS package.", str( DO_CREATE_SIS ).lower(), [ "true", "false"] ) 
 DO_CREATE_SIS = DO_CREATE_SIS == "true" 
@@ -297,14 +300,32 @@ for _x in [ "-h", "-H", "--help"]:
         __generate_help_message()        
         break    
 
+PATH_ARM_TOOLCHAIN = None
+def checkGCCE():
+    global PATH_ARM_TOOLCHAIN
+    paths = _p.split( os.path.pathsep )
+    for p in paths:
+        try:
+            items = os.listdir( p )
+        except WindowsError, msg: # TODO: WindowsError on windows... how about linux?
+            print msg
+            continue
+        
+        for i in items:
+            if i.startswith( "arm-none-symbianelf" ):
+                PATH_ARM_TOOLCHAIN = p
+                return True
+    return False 
+            
 # Check if GCCE setup is correct
-if len( PATH_ARM_TOOLCHAIN ) > 0:
-    PATH_ARM_TOOLCHAIN = PATH_ARM_TOOLCHAIN[0]
-elif COMPILER == COMPILER_GCCE and RUNNING_SCONS:
-    print "\nERROR"
-    print "-" * 79
-    print "Error: Unable to find '%s' from path. GCCE building will fail." % CSL_ARM_TOOLCHAIN_FOLDER_NAME
-    raise SystemExit( - 1 )#IGNORE:W1010
+#if len( PATH_ARM_TOOLCHAIN ) > 0:
+#    PATH_ARM_TOOLCHAIN = PATH_ARM_TOOLCHAIN[0]
+if COMPILER == COMPILER_GCCE and RUNNING_SCONS:
+    if not checkGCCE():
+        print "\nERROR"
+        print "-" * 79
+        print "Error: Unable to find 'arm-none-symbianelf' tools from path. GCCE building is not possible."
+        raise SystemExit( - 1 )#IGNORE:W1010
 
 # Check if WINSCW is found
 def __winscw_in_path():

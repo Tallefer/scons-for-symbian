@@ -762,7 +762,7 @@ class SymbianProgramHandler(object):
         
         # Sources depend on the headers generated from .rss files.
         env.Depends( object_paths, self.resource_headers )
-
+        
         # Get the lookup folders from source paths.
         object_folders = [ os.path.dirname( x ) for x in object_paths ]
 
@@ -951,9 +951,10 @@ class SymbianProgramHandler(object):
             kwargs[x] = getattr( self, x )
                     
         self._env = _create_environment( **kwargs )
-        
-        # Don't duplicate to ease use of IDE(Carbide)
-        self._env.BuildDir( self.output_folder, ".", duplicate = 0 )
+                
+        # File duplication can be disabled with SCons's -n parameter to ease use of IDE(Carbide)
+        # It seems that SCons is not always able to detect changes if duplication is disabled. 
+        self._env.VariantDir( self.output_folder, "." )#, duplicate = 1 )
         
         #------------------------------------------------------- Generate help files
         self._handleHelp()
@@ -981,14 +982,14 @@ class SymbianProgramHandler(object):
         self._env.Depends( build_prog, self.resource_headers )
 
         for dep in self.extra_depends:
-            self._env.Depends( self.sources, dep )
+            #self._env.Depends( self.sources, dep )
             self._env.Depends( build_prog, dep )
         
         #-------------------------------------------------------------- Copy results
         installed = self._copyResultBinary()
         
         #---------------------------------------------------------------- Export MMP
-        if self.mmpexport is not None:
+        if self.mmpexport is not None and MMP_EXPORT_ENABLED:
             exporter = mmp_parser.MMPExporter( self.mmpexport )
             data = exporter.MMPData
             
