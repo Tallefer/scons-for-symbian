@@ -4,10 +4,9 @@ from SCons.Script import DefaultEnvironment
 import arguments
 import os
 
-
+MAKESIS_EXECUTABLE = "makesis"
+    
 DEFAULT_PKG_TEMPLATE = """
-
-
 """
 
 def Makesis( pkgfile, package, installed = None, cert = None, key = None, passwd = "", env = None ):
@@ -31,7 +30,7 @@ def Makesis( pkgfile, package, installed = None, cert = None, key = None, passwd
     output_files = []
     output_files.append( package ) # Always
          
-    makesis = os.path.join( arguments.EPOC32_TOOLS, "makesis.exe" )
+    makesis = os.path.join( arguments.EPOC32_TOOLS, MAKESIS_EXECUTABLE )
     makesis = ( "%s %s %s" % ( makesis, pkgfile, unsigned_package ) )
     env.Command( unsigned_package, installed + [pkgfile],
              makesis, ENV = os.environ )
@@ -101,7 +100,8 @@ class PKGHandler:
         
         header = '#{"%(appname)s"},(%(uid)s),' % ( pkgargs )
         header += '%s,%s,%s' % tuple( version )
-        header += ',TYPE=%s\n\n' % pkgargs.get( "type", "SISSYSTEM" )
+        #header += ',TYPE=%s\n\n' % pkgargs.get( "type", "" )
+        header += "\n"
         
         f.write( ";Localised package name\n" )
         f.write( header )

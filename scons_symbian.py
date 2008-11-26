@@ -472,7 +472,12 @@ class SymbianProgramHandler(object):
             icon_targets.append( tmp )
             
             # Execute convert
-            self._env.Command( tmp, x, convert_icons_cmd % ( tmp, x ) )
+            result_mif = x
+            if os.name == "posix":
+                # Linux's mifconv fails with absolute paths without
+                result_mif = "/"+result_mif
+                
+            self._env.Command( tmp, x, convert_icons_cmd % ( tmp, result_mif ) )
             
             iconfilename = os.path.basename( tmp )
             
