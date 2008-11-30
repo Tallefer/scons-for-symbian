@@ -85,7 +85,10 @@ MMP_EXPORT_ENABLED = GetArg( "mmpexport", "Enable MMP export(if configured).", "
 MMP_EXPORT_ENABLED = MMP_EXPORT_ENABLED == "true"
 
 DO_CREATE_SIS = GetArg( "dosis", "Create SIS package.", str( DO_CREATE_SIS ).lower(), [ "true", "false"] ) 
-DO_CREATE_SIS = DO_CREATE_SIS == "true" 
+DO_CREATE_SIS = (DO_CREATE_SIS == "true" )
+
+DO_DUPLICATE_SOURCES = GetArg( "duplicate", "Duplicate sources to build dir.", "true", [ "true", "false"] )
+DO_DUPLICATE_SOURCES = (DO_DUPLICATE_SOURCES in ["true", 1])
 
 ENSYMBLE_AVAILABLE = False
 try:

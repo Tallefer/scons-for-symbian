@@ -423,7 +423,7 @@ class SymbianProgramHandler(object):
             setattr( self, arg, kwargs[arg] )
         
         #: Folder for compiler releasables.
-        self.output_folder = get_output_folder( COMPILER, RELEASE, self.target, self.targettype )
+        self.output_folder = ""
         
         
     def _isComponentEnabled(self):
@@ -832,8 +832,9 @@ class SymbianProgramHandler(object):
         #
         self.extra_depends.extend( helpresult )
         
-    def _handleMMP(self):
+    def _importMMP(self):
         import mmp_parser
+        
         p = mmp_parser.MMPParser( self.target )
         data = p.Parse()
         
@@ -866,8 +867,11 @@ class SymbianProgramHandler(object):
         if HELP_ENABLED: return
         
         if self.target.lower().endswith( ".mmp" ):
-            self._handleMMP()
-           
+            self._importMMP()
+        
+        # After mmp import
+        self.output_folder = get_output_folder( COMPILER, RELEASE, self.target, self.targettype )
+        
         if self.includes is None:
             self.includes = []
         
@@ -938,6 +942,8 @@ class SymbianProgramHandler(object):
         #      to fail.
         # Seems to work again without. What is going on here? Updated scons 1.1?
         #self.extra_depends.extend( self.sources )
+        if type(self.sources[0]) != str:
+            self.sources = [ x.path for x in self.sources ]
         self.origsources = self.sources[:]
         self.sources = [ join( self.output_folder, x ) for x in self.sources ]
         
@@ -959,7 +965,7 @@ class SymbianProgramHandler(object):
                 
         # File duplication can be disabled with SCons's -n parameter to ease use of IDE(Carbide)
         # It seems that SCons is not always able to detect changes if duplication is disabled. 
-        self._env.VariantDir( self.output_folder, "." )#, duplicate = 1 )
+        self._env.VariantDir( self.output_folder, ".", duplicate = DO_DUPLICATE_SOURCES )
         
         #------------------------------------------------------- Generate help files
         self._handleHelp()

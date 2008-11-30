@@ -199,11 +199,12 @@ class MMPParser:
                 result[keyword] = items
                 
             elif keyword == "sourcepath":
-                sourcepath = join(sourcepath, parts[1])
+                sourcepath = join(workingfolder, parts[1])
                 sourcepath = relpath(curdir, abspath(sourcepath))
-                print "Curdir:", sourcepath
+                #print "Curdir:", sourcepath
                 
             elif keyword == "start":
+                
                 result["resources"] += [ join(sourcepath, parts[ - 1]) ]
                 result["userinclude"] += [ sourcepath ]
         
