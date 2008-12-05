@@ -70,6 +70,8 @@ def create_environment( target,
                         includes,
                         sysincludes,
                         libraries,
+                        epocheapsize = None,
+                        epocstacksize = None,
                         *args,
                         **kwargs  
                         ):
@@ -106,7 +108,7 @@ def create_environment( target,
                     -msgstyle gcc
                     -stdlib "%(EPOCROOT)sepoc32/release/winscw/udeb/edll.lib"
                     -noentry -shared
-                    -subsystem windows
+                    -subsystem windows                    
                     -g
                     -export dllexport
                     -m __E32Dll
@@ -124,10 +126,28 @@ def create_environment( target,
                     -subsystem windows -g
                     -noimplib
                      """
-
-    #-search LogMan.o LogMan_UID_.o
-    #-o "%(TARGET)s.%(TARGETTYPE)s"
-    #import textwrap
+        
+        if epocstacksize is None:
+            # This is default for device builds so we'll use it here as well
+            epocstacksize = 80
+        else:
+            # Defined in bytes for device but in kilobytes for winscw
+            epocstacksize /= 1024
+        
+        LINKFLAGS += """
+            -stackreserve %d
+        """ % epocstacksize
+        
+        if epocheapsize is not None:
+            # TODO: Defined in both gcce.py and winscw.py. Relocate check to upper level
+            assert type( epocheapsize ) == tuple, "epocheapsize must be 2-tuple( minsize, maxsize )"
+            assert epocheapsize[0] >= 0x1000, "minimum heapsize must be at least 0x1000(4kb)"
+    
+            # Its defined as kilobytes here
+            LINKFLAGS += """
+                    -heapreserve=%d -heapcommit=%d
+            """ % ( epocheapsize[0] / 1024, epocheapsize[1] / 1024 )
+    
     LINKFLAGS = textwrap.dedent( LINKFLAGS )
     LINKFLAGS = " ".join( [ x.strip() for x in LINKFLAGS.split( "\n" ) ] )
 

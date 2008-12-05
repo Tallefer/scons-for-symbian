@@ -173,12 +173,14 @@ def create_environment( target,
     
     if epocstacksize is not None and targettype == TARGETTYPE_EXE:
         ELF2E32 += "--stack=" + "0x" + hex( epocstacksize ).replace( "0x", "" ).zfill( 8 )
+    # TODO: Defined in both gcce.py and winscw.py. Relocate check to upper level
     if epocheapsize is not None and targettype == TARGETTYPE_EXE:
-		assert type( epocheapsize ) == tuple, "epocheapsize must be 2-tuple( minsize, maxsize )"
-		min = hex( epocheapsize[0] ).replace("0x", "").zfill(8)
-		max = hex( epocheapsize[1] ).replace("0x", "").zfill(8)
-		ELF2E32 += " --heap=0x%s,0x%s " % ( min, max )
-		
+        assert type( epocheapsize ) == tuple, "epocheapsize must be 2-tuple( minsize, maxsize )"
+        assert epocheapsize[0] >= 0x1000, "minimum heapsize must be at least 0x1000(4kb)"
+        min = hex( epocheapsize[0] ).replace("0x", "").zfill(8)
+        max = hex( epocheapsize[1] ).replace("0x", "").zfill(8)
+        ELF2E32 += " --heap=0x%s,0x%s " % ( min, max )
+
     ELF2E32 = textwrap.dedent( ELF2E32 )
     ELF2E32 = " ".join( [ x.strip() for x in ELF2E32.split( "\n" ) ] )
 
