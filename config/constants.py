@@ -33,12 +33,21 @@ TARGETTYPE_UID_MAP = {
     TARGETTYPE_LIB : "",
 }
   
+#: Easy constant for self signed apps
+CAPS_SELF_SIGNED = [
+    "ReadUserData",    "WriteUserData", 
+    "NetworkServices", "UserEnvironment", 
+    "LocalServices"
+]
 
-#: Easy constant for free caps
-FREE_CAPS = "NetworkServices LocalServices ReadUserData " \
+#: Easy constant for caps granted for development certificate
+CAPS_DEV_CERT = "NetworkServices LocalServices ReadUserData " \
             "WriteUserData Location UserEnvironment PowerMgmt " \
             "ProtServ SwEvent SurroundingsDD ReadDeviceData " \
             "WriteDeviceData TrustedUI".split()
+
+#: For backward compatibility
+FREE_CAPS = CAPS_DEV_CERT
 
 #: Constant for S60 UI platform
 UI_PLATFORM_S60 = "S60"
