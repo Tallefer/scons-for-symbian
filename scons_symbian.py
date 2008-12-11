@@ -28,8 +28,8 @@ _OUTPUT_COLORIZER = colorizer.OutputConsole()
 Default( EPOCROOT )
 Default( "." )
 
-print "Building", COMPILER, RELEASE
-print "Defines", CMD_LINE_DEFINES
+sysout( "Building", COMPILER, RELEASE )
+sysout( "Defines", CMD_LINE_DEFINES )
 
 # in template
 # UID1 = 0x100039ce for exe

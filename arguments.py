@@ -14,6 +14,13 @@ import sys
 #: and Epydoc.
 RUNNING_SCONS = ( "scons" in sys.argv[0] or "-c" == sys.argv[0] )
 
+def sysout(*args):
+    if not RUNNING_SCONS: return
+    
+    for a in args:
+        print a,
+    print
+
 VARS = Variables( 'arguments.py' )
 def GetArg( name, helpmsg, default, allowed_values = None, caseless = True ):
     """Utility for adding help information and retrieving argument"""
@@ -31,7 +38,7 @@ def GetArg( name, helpmsg, default, allowed_values = None, caseless = True ):
 
 #: Symbian SDK folder
 EPOCROOT = os.environ.get( "EPOCROOT", EPOCROOT )   
-print "EPOCROOT=%s" % EPOCROOT
+sysout( "EPOCROOT=%s" % EPOCROOT )
 
 #: Constant pointing to EPOCROOT/epoc32
 EPOC32 = join( EPOCROOT, 'epoc32' )
@@ -96,13 +103,13 @@ try:
         __import__( "ensymble" )
         ENSYMBLE_AVAILABLE = True
 except ImportError:
-    print "Info: Automatic SIS creation requires Ensymble."
+    sysout( "Info: Automatic SIS creation requires Ensymble." )
 
 if COMPILER == COMPILER_WINSCW:
     DO_CREATE_SIS = False
     
 if not DO_CREATE_SIS:
-    print "Info: SIS creation disabled"
+    sysout( "Info: SIS creation disabled" )
 
 #: Constant for ui platform version
 UI_VERSION = ( 3, 0 )
@@ -177,8 +184,8 @@ def _resolve_platform():
 
 _resolve_platform()
 
-print "Info: Symbian OS version = %d.%d" % SYMBIAN_VERSION
-print "Info: UI platform        = %s" % UI_PLATFORM, "%d.%d" % UI_VERSION
+sysout( "Info: Symbian OS version = %d.%d" % SYMBIAN_VERSION )
+sysout( "Info: UI platform        = %s" % UI_PLATFORM, "%d.%d" % UI_VERSION )
 
 #: Built components. One SConstruct can define multiple SymbianPrograms.
 #: This can be used from command-line to build only certain SymbianPrograms
