@@ -5,7 +5,7 @@ Main S4S module
 from SCons.Builder import Builder
 from SCons.Script import (Command, Copy, DefaultEnvironment, Install, Mkdir, Clean, Default)
 from arguments import * #IGNORE:W0611
-from os.path import join, basename
+from os.path import join, basename, abspath
 import mmp_parser
 import colorizer
 import gcce
@@ -444,6 +444,40 @@ class SymbianProgramHandler(object):
         
         return True
     
+    def _doConvertIcons( self, env, target, source):
+    	
+    	# Creates 32 bit icons
+        convert_icons_cmd = ( EPOCROOT + r'epoc32/tools/mifconv "%s" /c32 "%s"' ).replace( "\\", "/" )
+        
+        source_icon = source[0].abspath
+        target_icon = target[0].abspath
+           
+    	
+        # Copy the file to current drive. This fixes also issues with some(old) 
+        # versions of mifconv not accepting drive letter in paths
+        if not os.path.exists( "\\TMP"):
+        	os.mkdir("\\TMP")
+        
+        import tempfile	
+        fileid, mifpath = tempfile.mkstemp( suffix=".mif", dir="\\TMP" )
+        if ":" in mifpath:
+        	mifpath = mifpath.split(":")[-1]
+        cmd = convert_icons_cmd % ( mifpath, abspath(source_icon) )
+        
+        # TODO: Use colorizer
+        print( cmd )
+        err = os.system( cmd )
+        
+        import shutil
+        print( "scons: Copying temporary '%s' to '%s'" % (mifpath, target_icon ) )
+        shutil.copyfile( mifpath, target_icon )
+        
+        # Close so we can remove it 
+        os.close(fileid)        
+        os.remove(mifpath)
+        
+        return err
+        
     def _handleIcons(self):
         """Sets self.converted_icons"""   
         #TODO: Create main interface SymbianIcon for generic icons
@@ -458,29 +492,41 @@ class SymbianProgramHandler(object):
         sdk_resource = join( EPOCROOT + r"epoc32", "release", COMPILER,
                          RELEASE, "z", "resource", "apps", "%s" )
 
-        # Creates 32 bit icons
-        convert_icons_cmd = ( EPOCROOT + r'epoc32/tools/mifconv "%s" /c32 "%s"' ).replace( "\\", "/" )
         
-        # TODO: Accept 2-tuple, first is the source, second: resulting name
+        
         icon_target_path = join( self.output_folder, "%s_aif.mif" )
         icon_targets = [] # Icons at WINSCW/...
         sdk_icons = [] # Icons at /epoc32
-        copyres_cmds = [] # Commands to copy icons from WINSCW/ to /epoc32
+        copyres_cmds = [] # Commands to copy icons from WINSCW/ to /epoc32                       
         
-        for x in self.icons:
-            tmp = icon_target_path % ( self.target )
+        for x in self.icons:            
+            
+            # Accepts 2-tuple, first is the source, second: resulting name
+            tmp = ""
+            icon_name = x
+            source_icon = x
+            #import pdb;pdb.set_trace()
+            if type( x ) == tuple:
+                icon_name = x[1]
+                source_icon = x[0]
+            else:
+                # Strip the extension from the file name
+                icon_name = ".".join(icon_name.split(".")[:-1])
+            tmp = icon_target_path % ( icon_name )
             icon_targets.append( tmp )
             
+            icon_name = abspath( icon_name )
+            source_icon = abspath( source_icon )
+            
             # Execute convert
-            result_mif = x
             if os.name == "posix":
                 # Linux's mifconv fails with absolute paths without
-                result_mif = "/"+result_mif
+                source_icon = "/"+source_icon
                 
-            self._env.Command( tmp, x, convert_icons_cmd % ( tmp, result_mif ) )
+            self._env.Command( tmp, source_icon, self._doConvertIcons)
             
             iconfilename = os.path.basename( tmp )
-            
+            # TODO: Use Install instead. Copy does not seem to work if there are changes.
             sdk_target = sdk_resource % iconfilename
             copyres_cmds.append( Copy( sdk_target, tmp ) )
             sdk_icons.append( sdk_target )
@@ -577,6 +623,11 @@ class SymbianProgramHandler(object):
             prev_resource = None
             
             for rss_path in self.resources:
+                if type(rss_path) != str:
+                    #Assuming File type then
+                    rss_path = rss_path.abspath
+                    #import pdb;pdb.set_trace()
+                
                 rss_notype = ".".join( os.path.basename( rss_path ).split( "." )[: - 1] ) # ignore rss
                 converted_rsg = join( self.output_folder, "%s.rsg" % rss_notype )
                 converted_rsc = join( self.output_folder, "%s.rsc" % rss_notype )
@@ -662,14 +713,14 @@ class SymbianProgramHandler(object):
             resultables = [ self._target_resultable % ( "" ) ]
             if output_lib:
                 resultables.append( self.output_libpath )
-
+            
             # Create final binary and lib/dso
             self._env.Elf( resultables, temp_dll_path )#IGNORE:E1101
 
         else:
             build_prog = env.StaticLibrary( self._target_resultable % ".lib" , self.sources )#IGNORE:E1101
             self.output_libpath = ( self._target_resultable % ".lib",
-                                EPOCROOT + r"epoc32/release/armv5/%s/%s.lib" % ( RELEASE, self.target ) )
+                                    EPOCROOT + r"epoc32/release/armv5/%s/%s.lib" % ( RELEASE, self.target ) )
             
         return build_prog
     
@@ -953,6 +1004,7 @@ class SymbianProgramHandler(object):
         
         # Target resultable template. Just give extension of the file
         self._target_resultable = "%s/%s" % FOLDER_TARGET_TUPLE + "%s"
+        self._target_resultable = os.path.abspath( self._target_resultable )
         
         # Copy the modified keywords from self ignoring private 
         kwargs = {}

@@ -40,6 +40,9 @@ WARNINGS_C = "-Wall -Wno-unknown-pragmas -fexceptions " \
 WARNINGS_CXX = WARNINGS_C + " -Wno-ctor-dtor-privacy"
             
 
+#: Environment cache
+_GCCE_ENV = None
+
 def create_environment( target,
                         targettype,
                         includes,
@@ -53,7 +56,7 @@ def create_environment( target,
                         defines = None,
                         allowdlldata = True,
                         epocstacksize = None,
-						epocheapsize = None,
+                        epocheapsize = None,
                         gcce_options = None,
                         **kwargs ):
     """Create GCCE building environment    
@@ -164,7 +167,7 @@ def create_environment( target,
                 --fpu=softvfp --targettype=%(TARGETTYPE)s
                 --output=$TARGET
                 %(DEFCONFIG)s
-                --elfinput="%(WORKING_DIR)s/$SOURCE"
+                --elfinput="%(WORKING_DIR)s$SOURCE"
                 --linkas=%(TARGET)s{000a0000}.%(TARGETTYPE)s
                 --libpath="%(EPOCROOT)sepoc32/release/armv5/lib"
                 """
@@ -209,7 +212,10 @@ def create_environment( target,
         
         uid1 = TARGETTYPE_UID_MAP[TARGETTYPE_DLL]#"0x10000079" # DLL
     
-    env = Environment ( 
+    
+    global _GCCE_ENV    
+    if _GCCE_ENV is None:
+        _GCCE_ENV = Environment ( 
                     tools = ["mingw"], # Disable searching of tools
                     ENV = os.environ,
                     # Static library settings
@@ -219,7 +225,7 @@ def create_environment( target,
                     
                     # Compiler settings
                     CC = r'arm-none-symbianelf-g++',
-                    CFLAGS = WARNINGS_C + " -x c -include " + COMPILER_INCLUDE,
+                    CFLAGS = WARNINGS_C + " " + gcce_options + " -x c -include " + COMPILER_INCLUDE,
                     
                     CXX = r'arm-none-symbianelf-g++',
                     CXXFLAGS = WARNINGS_CXX + " " + gcce_options + " -x c++ -include %s " % ( COMPILER_INCLUDE ),
@@ -241,6 +247,26 @@ def create_environment( target,
                     LIBLINKPREFIX = " ",
                     PROGSUFFIX = ".noelfexe"
                 )
+        env = _GCCE_ENV        
+    else:
+        # A lot faster than creating the environment from scratch               
+        env = _GCCE_ENV.Clone()        
+    
+    env.Replace(         
+        ENV = os.environ,
+                        
+        CFLAGS = WARNINGS_C + " " + gcce_options + " -x c -include " + COMPILER_INCLUDE,                
+        CXXFLAGS = WARNINGS_CXX + " " + gcce_options + " -x c++ -include %s " % ( COMPILER_INCLUDE ),
+        
+        # isystem does not work so just adding the system include paths before normal includes.
+        CPPPATH = sysincludes + includes,
+        CPPDEFINES = defines,        
+        
+        # Linker settings                
+        LINKFLAGS = LINKFLAGS,
+        LIBS = libraries,    
+    )
+    
     
     # Add GCC binaries to path head, so we are sure to use them instead of some other (Cygwin, Carbide)
     # TODO: Windows specific
@@ -256,7 +282,7 @@ def create_environment( target,
                           "CAPABILITIES": "+".join( capabilities ),
                           "TARGET"      : target,
                           "release"     : RELEASE,
-                          "WORKING_DIR" : os.path.abspath( "." ),
+                          "WORKING_DIR" : "",#os.path.abspath( "." ),
                           "TARGETTYPE"  : elf_targettype,
                           "UID1"        : uid1,
                           "UID2"        : uid2,

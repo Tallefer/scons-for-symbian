@@ -3,6 +3,7 @@
 from SCons.Script import DefaultEnvironment
 import arguments
 import os
+from relpath import relpath
 
 MAKESIS_EXECUTABLE = "makesis"
     
@@ -124,6 +125,9 @@ class PKGHandler:
                 t[0] = t[0] + ":"
             t = "\\".join( t ).replace( "/", "\\" )
             x = x.replace( "/", "\\" )
+            #import pdb;pdb.set_trace()
+            x = relpath( os.getcwd(), x )
+            
             f.write( '%-50s - "%s"\n' % ( '"%s"' % x, t ) )
         
         f.close()

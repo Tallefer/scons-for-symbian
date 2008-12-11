@@ -64,6 +64,8 @@ def make_capability_hex(capabilities):
         val = CAPABILITY_MAP[cap.upper()]
         result += val
     return "0x" + hex(result)[2:].zfill(8)
+
+_WINSCW_ENV = None
                         
 def create_environment( target,
                         targettype,
@@ -162,8 +164,12 @@ def create_environment( target,
         sysincludes = "-I" + " -I".join( sysincludes )
     else:
         sysincludes = " "
-        
-    env = Environment( 
+    
+    global _WINSCW_ENV
+    env = None
+    if _WINSCW_ENV is None:
+        #print "env"
+        _WINSCW_ENV = Environment( 
                     tools = ["mingw"], # Disable searching of tools
                     
                     CC = r'mwccsym2',
@@ -189,5 +195,26 @@ def create_environment( target,
                     LIBLINKPREFIX = " ",
                     PROGSUFFIX = "." + targettype,
 
-                )
+        )
+        #print "end"
+        env = _WINSCW_ENV
+    else:
+        # A lot faster than creating the environment from scratch
+        #print "clone"        
+        env = _WINSCW_ENV.Clone()
+        #print "env"
+            
+    env.Replace( ENV = os.environ, #os.environ['PATH'],
+                 
+                 # Static library settings                                        
+                 CPPPATH = includes,
+                 CPPDEFINES = defines,
+                 CCFLAGS = WINSCW_CC_FLAGS + ' -cwd source -I- %s -include "%s"' % ( sysincludes, platform_header ),                    
+                    
+                 # Linker settings                    
+                 LINKFLAGS = LINKFLAGS,
+                 LIBS = LIBRARIES,                    
+                 PROGSUFFIX = "." + targettype,
+    )
+    
     return env

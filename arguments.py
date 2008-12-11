@@ -6,7 +6,7 @@ __license__ = "MIT License"
 from SCons.Script import ARGUMENTS, DefaultEnvironment, HelpFunction as Help
 from SCons.Variables import Variables, EnumVariable
 from config import * #IGNORE:W0611
-from os.path import join
+from os.path import join, abspath
 import os
 import sys
 
@@ -81,7 +81,7 @@ COMPILER = GetArg( "compiler", "The compiler to use.", COMPILER, COMPILERS )
 RELEASE = GetArg( "release", "Release type.", RELEASE, RELEASETYPES )
 
 #: Location for the packages. Value generated in run-time.
-PACKAGE_FOLDER = join( "%s_%s" % ( COMPILER, RELEASE ), "packages" )
+PACKAGE_FOLDER = abspath( join( "%s_%s" % ( COMPILER, RELEASE ), "packages" ) )
 
 #: Compiler flags for GCCE
 GCCE_OPTIMIZATION_FLAGS = GetArg( "gcce_options", "GCCE compiler options.",
@@ -285,7 +285,8 @@ else:
     DEFAULT_SYMBIAN_DEFINES.append( "_DEBUG" )
 
 def get_output_folder( compiler, release, target, targettype ):
-    return os.path.join( compiler + "_" + release, target + "_" + targettype )
+    p = os.path.join( compiler + "_" + release, target + "_" + targettype )
+    return os.path.abspath( p )
 
 # Generate help message
 def __generate_help_message():
