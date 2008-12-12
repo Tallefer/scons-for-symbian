@@ -137,13 +137,14 @@ class PKGHandler:
         keys = files.keys();keys.sort()
         for x in keys:
             t = files[x]
-            t = t.split( "/" )
+            # Do split in platform independent way
+            t = t.replace("\\","/").split( "/" )
             if t[0] == "any":
                 t[0] = "!:"
             else:
                 t[0] = t[0] + ":"
-            t = "\\".join( t ).replace( "/", "\\" )
-            
+            # Convert the slashes for pkg
+            t = "\\".join( t ).replace( "/", "\\" )            
             
             #import pdb;pdb.set_trace()
             x = relpath( os.getcwd(), x )
