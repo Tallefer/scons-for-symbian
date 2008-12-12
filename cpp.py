@@ -25,7 +25,7 @@ def Preprocess( env, target, source, includes, fileinc, defines ):
             if not x.startswith( "/" ):
                 return x
             
-            p = relpath.relpath( abspath( os.curdir ), x )
+            p = relpath.relpath( os.getcwd(), x )
             #print p
             return p
             
@@ -39,8 +39,8 @@ def Preprocess( env, target, source, includes, fileinc, defines ):
             " -I ".join( [ handle_path(x) for x in includes ]  ),
 
             " -D" + " -D".join( defines ),
-            source,
-            " -o %s" % target,
+            handle_path(source),
+            " -o %s" % handle_path(target),
             " -include",
             " -include ".join( [ handle_path(x) for x in fileinc ] )
         ]

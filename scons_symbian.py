@@ -449,33 +449,44 @@ class SymbianProgramHandler(object):
     	# Creates 32 bit icons
         convert_icons_cmd = ( EPOCROOT + r'epoc32/tools/mifconv "%s" /c32 "%s"' ).replace( "\\", "/" )
         
-        source_icon = source[0].abspath
-        target_icon = target[0].abspath
-           
-    	
-        # Copy the file to current drive. This fixes also issues with some(old) 
-        # versions of mifconv not accepting drive letter in paths
-        if not os.path.exists( "\\TMP"):
-        	os.mkdir("\\TMP")
-        
-        import tempfile	
-        fileid, mifpath = tempfile.mkstemp( suffix=".mif", dir="\\TMP" )
-        if ":" in mifpath:
-        	mifpath = mifpath.split(":")[-1]
-        cmd = convert_icons_cmd % ( mifpath, abspath(source_icon) )
-        
-        # TODO: Use colorizer
-        print( cmd )
-        err = os.system( cmd )
-        
-        import shutil
-        print( "scons: Copying temporary '%s' to '%s'" % (mifpath, target_icon ) )
-        shutil.copyfile( mifpath, target_icon )
-        
-        # Close so we can remove it 
-        os.close(fileid)        
-        os.remove(mifpath)
-        
+        if os.name == 'nt':
+            source_icon = source[0].abspath
+            target_icon = target[0].abspath
+               
+        	
+            # Copy the file to current drive. This fixes also issues with some(old) 
+            # versions of mifconv not accepting drive letter in paths
+            if not os.path.exists( "/tmp"):
+            	os.mkdir("/tmp")
+            
+            import tempfile	
+            fileid, mifpath = tempfile.mkstemp( suffix=".mif", dir="/tmp" )
+            if ":" in mifpath:
+            	mifpath = mifpath.split(":")[-1]
+            cmd = convert_icons_cmd % ( mifpath, abspath(source_icon) )
+            import pdb;pdb.set_trace()
+            # TODO: Use colorizer
+            print( cmd )
+            err = os.system( cmd )
+            
+            import shutil
+            print( "scons: Copying temporary '%s' to '%s'" % (mifpath, target_icon ) )
+            shutil.copyfile( mifpath, target_icon )
+            
+            # Close so we can remove it 
+            os.close(fileid)        
+            os.remove(mifpath)
+        else:
+            from relpath import relpath
+            source_icon = relpath(os.getcwd(), source[0].tpath)
+            target_icon = target[0].tpath
+            
+            cmd = convert_icons_cmd % ( target_icon, source_icon )
+            #import pdb;pdb.set_trace()
+            # TODO: Use colorizer
+            print( cmd )
+            err = os.system( cmd )
+            
         return err
         
     def _handleIcons(self):

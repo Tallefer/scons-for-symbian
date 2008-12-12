@@ -3,6 +3,7 @@
 from SCons.Script import DefaultEnvironment
 import arguments
 import os
+import sys
 from relpath import relpath
 
 MAKESIS_EXECUTABLE = "makesis"
@@ -10,6 +11,24 @@ MAKESIS_EXECUTABLE = "makesis"
 DEFAULT_PKG_TEMPLATE = """
 """
 
+#: Use absolute path on windows but relative on linux
+#: Todo: Invent more generic place and better name for this!
+handle_path = os.path.abspath
+    
+if sys.platform == "linux2":
+    # Use relative on linux
+    
+    def h( x ):
+        import relpath
+        if not x.startswith( "/" ):
+            return x
+        
+        p = relpath.relpath( os.getcwd(), x )
+        #print p
+        return p
+        
+    handle_path = h 
+    
 def Makesis( pkgfile, package, installed = None, cert = None, key = None, passwd = "", env = None ):
     """
     Call makesis command line utility to create a sis package.
@@ -46,7 +65,7 @@ def SignSis(target, source, cert, key, passwd = "", env = None):
     if env is None: env = DefaultEnvironment()
     
     signsis = os.path.join( arguments.EPOC32_TOOLS, "signsis.exe" )
-    signsis = ( "%s %s %s %s %s %s" % ( signsis, source, target, cert, key ,passwd ) )
+    signsis = ( "%s %s %s %s %s %s" % ( signsis, handle_path(source), handle_path(target), handle_path(cert), handle_path(key) ,passwd ) )
     env.Command( target, source, signsis, ENV = os.environ )
     
     return [target]
@@ -118,7 +137,7 @@ class PKGHandler:
         keys = files.keys();keys.sort()
         for x in keys:
             t = files[x]
-            t = t.split( "\\" )
+            t = t.split( "/" )
             if t[0] == "any":
                 t[0] = "!:"
             else:
