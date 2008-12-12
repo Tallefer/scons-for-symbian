@@ -464,7 +464,7 @@ class SymbianProgramHandler(object):
             if ":" in mifpath:
             	mifpath = mifpath.split(":")[-1]
             cmd = convert_icons_cmd % ( mifpath, abspath(source_icon) )
-            import pdb;pdb.set_trace()
+            
             # TODO: Use colorizer
             print( cmd )
             err = os.system( cmd )
