@@ -106,12 +106,19 @@ class PKGHandler:
         #pkgfilename = GetPkgFilename( package )
         #Depends( package, pkgfilename )
         
+            
         print "Creating pkg", pkgfilename
         #f=codecs.open( pkgfilename, 'wb', encoding="utf-16le");
         f = open( pkgfilename, 'w' )
                 
         files = self.Package( package )
         pkgargs = self.PackageArgs( package )
+        
+        # Set deps
+        files_value = env.Value(files)
+        env.Depends( pkgfilename, files_value )        
+        pkgargs_value = env.Value(files)
+        env.Depends( pkgfilename, pkgargs_value )
         
         if type( pkgargs["uid"] ) != str:
             pkgargs["uid"] = hex( pkgargs["uid"] ).replace("L","")

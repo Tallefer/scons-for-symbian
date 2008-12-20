@@ -503,8 +503,6 @@ class SymbianProgramHandler(object):
         sdk_resource = join( EPOCROOT + r"epoc32", "release", COMPILER,
                          RELEASE, "z", "resource", "apps", "%s" )
 
-        
-        
         icon_target_path = join( self.output_folder, "%s_aif.mif" )
         icon_targets = [] # Icons at WINSCW/...
         sdk_icons = [] # Icons at /epoc32
@@ -768,7 +766,7 @@ class SymbianProgramHandler(object):
             env.CreateUID( uid_cpp_filename, self.sources )#IGNORE:E1101        
             
             # uid.cpp depends on the value of the capabilities
-            import SCons.Node.Python
+            #import SCons.Node.Python
             caps_value = env.Value(self.capabilities)
             env.Depends( uid_cpp_filename, caps_value )
             
@@ -1004,10 +1002,21 @@ class SymbianProgramHandler(object):
         #      to fail.
         # Seems to work again without. What is going on here? Updated scons 1.1?
         #self.extra_depends.extend( self.sources )
+        
         if type(self.sources[0]) != str:
             self.sources = [ x.path for x in self.sources ]
         self.origsources = self.sources[:]
-        self.sources = [ join( self.output_folder, x ) for x in self.sources ]
+        
+        tmp = []
+        updirs = [] 
+        for x in self.sources:
+            updirs.append( x.count("..") )
+            x = x.replace("..", "_up_")
+            x = join( self.output_folder, x )
+            tmp.append(x)
+             
+        #self.sources = [ join( self.output_folder, x ) for x in self.sources ]
+        self.sources = tmp
         
         # This is often needed
         FOLDER_TARGET_TUPLE = ( self.output_folder, self.target )    
@@ -1029,6 +1038,17 @@ class SymbianProgramHandler(object):
         # File duplication can be disabled with SCons's -n parameter to ease use of IDE(Carbide)
         # It seems that SCons is not always able to detect changes if duplication is disabled. 
         self._env.VariantDir( self.output_folder, ".", duplicate = DO_DUPLICATE_SOURCES )
+                
+        # Define build dir for top folders.    
+        updirs = list(set(updirs))        
+        # Zero not valid in updirs
+        if 0 in updirs: updirs.remove( 0 )
+        for count in updirs:
+            out_updir = "/" + "/".join( ["_up_"] * count )
+            src_updir = "/".join( [".."] * count )
+            print self.output_folder + out_updir, src_updir
+            self._env.VariantDir( self.output_folder + out_updir, src_updir, duplicate = DO_DUPLICATE_SOURCES )
+        
         
         #------------------------------------------------------- Generate help files
         self._handleHelp()

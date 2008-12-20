@@ -7,16 +7,20 @@ __author__ = "Jussi Toivola"
 __license__ = "MIT License"
 
 #TODO: Preprocess the mmp file
-from os.path import join, abspath, dirname
+from os.path import abspath, dirname
 from relpath import relpath
 import os
 import sys
 
 from config.constants import *
 
+def join(*args):
+    return "/".join( args )
+    
+
 KEYWORDS = ("target", "targettype", "library", "source", "systeminclude", "userinclude",
-              "staticlibary", "epocallowdlldata", "macro", "capability", "epocstacksize",
-              "resources", "uid"
+              "staticlibrary", "epocallowdlldata", "macro", "capability", "epocstacksize",              
+              "epocheapsize", "resources", "uid"
             )
 
 class MMPData(object):
@@ -143,7 +147,7 @@ class MMPExporter(object):
         
         result.append( "EXPORTUNFROZEN")
                                     
-        self.MMPContents = "\n".join(result).replace("/", "\\")
+        self.MMPContents = "\n".join(result).replace("\\", "/")
         return self.MMPContents
     
     def Save(self):
@@ -153,18 +157,26 @@ class MMPExporter(object):
     
 class MMPParser:
     """Parse MMP to be built with SCons for Symbian"""
-    def __init__(self, sourcefile):
+    def __init__(self, source):
         #: Path to the MMP file.
-        self.Source = sourcefile
+        self.source = source
         
     def Parse(self):
-        f = open(self.Source)
+        f = open(self.source)
         lines = f.readlines()
         f.close()
         
-        workingfolder = os.path.dirname(self.Source)
-        sourcepath = workingfolder
-        curdir = abspath(os.curdir)
+        workingfolder = os.path.dirname(os.path.abspath(self.source)).replace("\\", "/")        
+        curdir   = abspath(os.curdir)
+        
+        if os.name == "nt":
+            # Remove drive letter if on same drive as target            
+            if curdir.split(":")[0].lower() == workingfolder.lower().split(":")[0]:
+                curdir        = curdir.split(":")[1]
+                workingfolder = workingfolder.split(":")[1]
+        
+        sourcepath = workingfolder                
+        epocroot = os.environ["EPOCROOT"].replace("\\","/")
         
         lines = [x for x in lines if len(x.strip()) > 0 ]        
         
@@ -174,6 +186,7 @@ class MMPParser:
             result[x] = []
         result["epocallowdlldata"] = False # Not enabled with regular scripts either
         result["epocstacksize"].append(hex(8 * 1024))
+        result["epocheapsize"] = ( hex(1024), hex(1024*1024 ))
         result["uid"] += [ None, None]
         for line in lines:                        
             parts = line.split()
@@ -181,15 +194,28 @@ class MMPParser:
             if keyword in KEYWORDS:
                 items = result.get(keyword, [])                
                 if len(parts) > 1:
-                    if keyword == "source":
+                    if keyword == "source":                        
                         files = []
-                        files = [ join(sourcepath, x) for x in parts[1:] ]
+                        files = [ join(sourcepath, x).replace("\\","/") for x in parts[1:] ]
                         items += files
                     elif keyword == "library":
                         libs = [ x.lower().replace(".lib", "") for x in parts[1:] ]
                         items += libs
+                    elif keyword == "uid":
+                        items = parts[1:] 
                     elif keyword in [ "systeminclude", "userinclude"]:
-                        items += [ join(workingfolder, x) for x in parts[1:] ] 
+                        
+                        for p in parts[1:]:
+                            p = p.replace("\\","/")
+                            if p[0] in [ "/", "+"] or ":" in p:
+                                items += [ (epocroot + p[1:]).replace("\\","/") ]
+                                #print "1", items                                
+                            elif p == ".":
+                                items += [workingfolder]
+                                #print "2", items
+                            else:                                
+                                items += [ relpath( workingfolder, p) ]
+                                #print "3", items
                     else:
                         items += parts[1:]
                 else:
@@ -199,9 +225,8 @@ class MMPParser:
                 result[keyword] = items
                 
             elif keyword == "sourcepath":
-                sourcepath = join(workingfolder, parts[1])
-                sourcepath = relpath(curdir, abspath(sourcepath))
-                #print "Curdir:", sourcepath
+                sourcepath = parts[1].replace("\\","/")
+                sourcepath = relpath(curdir, abspath(sourcepath))                
                 
             elif keyword == "start":
                 
