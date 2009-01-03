@@ -51,7 +51,8 @@ def _create_environment( *args, **kwargs ):
 
 def SymbianPackage( package, ensymbleargs = None, pkgargs = None,
                     pkgfile = None, extra_files = None, source_package = None,
-                    env=None, startonboot = None ):
+                    env=None, startonboot = None,
+                    pkgtemplate = None, preppydata = None):
     """
     Create Symbian Installer( sis ) file. Can use either Ensymble or pkg file.
     To enable creation, give command line arg: dosis=true
@@ -78,6 +79,12 @@ def SymbianPackage( package, ensymbleargs = None, pkgargs = None,
     
     @param startonboot: Name of the executable to be started on boot
     @type startonboot: str
+    
+    @param pkgtemplate: preppy template for generating pkg.
+    @type pkgtemplate: str
+    
+    @param preppydata: Dictionary containing the data used with pkg template
+    @type  preppydata: dict
     
     @param extra_files: Copy files to package folder and install for simulator( to SIS with Ensymble only )
     """                     
@@ -110,12 +117,29 @@ def SymbianPackage( package, ensymbleargs = None, pkgargs = None,
         
         if pkgargs is None:
             pkgargs = {}
-        
+                        
         PKG_HANDLER.PackageArgs( package ).update( pkgargs )
         PKG_HANDLER.pkg_sis[pkgfile] = source_package
+        PKG_HANDLER.pkg_template[pkgfile] = (pkgtemplate,preppydata)        
+         
         Command( pkgfile, PKG_HANDLER.pkg_files[package].keys(),
                         PKG_HANDLER.GeneratePkg, ENV = os.environ )
+                
+        # Set deps
+        files = PKG_HANDLER.Package( package )
+        files_value = env.Value(files)
+        env.Depends( pkgfile, files_value )
         
+        pkgargs = PKG_HANDLER.PackageArgs( package )        
+        pkgargs_value = env.Value(pkgargs)
+        env.Depends( pkgfile, pkgargs_value )        
+        
+        if pkgtemplate is not None:
+            if os.path.isfile(pkgtemplate):
+                env.Depends( pkgfile, pkgtemplate )
+            else:
+                template_value = env.Value(pkgtemplate)
+                env.Depends( pkgfile, template_value )
         
     if COMPILER != COMPILER_WINSCW:
         if pkgargs is not None:     
@@ -138,8 +162,7 @@ def SymbianPackage( package, ensymbleargs = None, pkgargs = None,
         
         content = template % { "APPNAME" : startonboot }
                 
-        content = textwrap.dedent(content)
-        print content
+        content = textwrap.dedent(content)        
         
         f = open( target[0].path, 'w' )
         f.write(content)
@@ -724,8 +747,10 @@ class SymbianProgramHandler(object):
                 resultables.append( self.output_libpath )
             
             # Create final binary and lib/dso
-            self._env.Elf( resultables, temp_dll_path )#IGNORE:E1101
-
+            env.Elf( resultables, temp_dll_path )#IGNORE:E1101
+            #import pdb;pdb.set_trace()
+            env.Install( EPOCROOT + r"epoc32/release/gcce/%s" % ( RELEASE ),
+                         ".".join( [resultables[0], self.targettype] ) )
         else:
             build_prog = env.StaticLibrary( self._target_resultable % ".lib" , self.sources )#IGNORE:E1101
             self.output_libpath = ( self._target_resultable % ".lib",
@@ -954,6 +979,8 @@ class SymbianProgramHandler(object):
         
         if self.libraries is None:
             self.libraries = []
+        # Copied to avoid modifying the user's list
+        self.libraries     = self.libraries[:] 
         self.origlibraries = self.libraries[:]
         
         if CMD_LINE_LIBS is not None:

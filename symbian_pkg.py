@@ -80,6 +80,7 @@ class PKGHandler:
         self.pkg_files = {}
         self.pkg_args = {}
         self.pkg_sis = {}
+        self.pkg_template = {}    
         
     def Package( self, package ):
         pkg = self.pkg_files.get( package, {} )
@@ -100,26 +101,39 @@ class PKGHandler:
         """ SCons Command to generate PKG file
         @param target: Contains the pkg filename
         """
-        
         pkgfilename = target[0].path
         package = self.pkg_sis[pkgfilename]
-        #pkgfilename = GetPkgFilename( package )
-        #Depends( package, pkgfilename )
-        
-            
-        print "Creating pkg", pkgfilename
-        #f=codecs.open( pkgfilename, 'wb', encoding="utf-16le");
-        f = open( pkgfilename, 'w' )
-                
         files = self.Package( package )
         pkgargs = self.PackageArgs( package )
         
-        # Set deps
-        files_value = env.Value(files)
-        env.Depends( pkgfilename, files_value )        
-        pkgargs_value = env.Value(files)
-        env.Depends( pkgfilename, pkgargs_value )
+        template = self.pkg_template.get(pkgfilename, None)
         
+        # 2-tuple containing preppy template and data
+        if None not in template:
+            import preppy # Import here. Slow so imported only if needed.
+                        
+            template, data = template
+            
+            # Get contents if file
+            if os.path.isfile(template):
+                print( "scons: Reading preppy template '%s'" % template )
+                f=open(template,'rb')
+                template = f.read();
+                f.close()                
+            
+            m = preppy.getModule("pkg", sourcetext=template)
+            outputfile = open( pkgfilename, 'wb')
+            
+            data["files"] = files
+            data.update( pkgargs )
+            print( "scons: Generating pkg '%s' from preppy template " % pkgfilename )
+            m.run( data, outputfile = outputfile )
+            return
+                
+        # TODO: Use preppy here as well with default template     
+        print "Creating pkg", pkgfilename        
+        f = open( pkgfilename, 'w' )
+                             
         if type( pkgargs["uid"] ) != str:
             pkgargs["uid"] = hex( pkgargs["uid"] ).replace("L","")
         
