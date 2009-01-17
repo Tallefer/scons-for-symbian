@@ -96,10 +96,12 @@ def create_environment( target,
     defines.extend( DEFAULT_WINSCW_DEFINES )
     defines.extend( CMD_LINE_DEFINES )
 
-    if targettype in DLL_TARGETTYPES:
-        defines.append( "__DLL__" )
-    else:
-        defines.append( "__EXE__" )
+    # TODO: Take lib out of DLL_TARGETTYPES
+    if targettype != TARGETTYPE_LIB:
+        if targettype in DLL_TARGETTYPES:
+            defines.append( "__DLL__" )
+        else:
+            defines.append( "__EXE__" )
     defines = [ '"%s"' % x for x in defines ]
 
     WINSCW_CC_FLAGS = '-g -O0 -inline off -wchar_t off -align 4 -warnings on -w nohidevirtual,nounusedexpr -msgstyle gcc -enum int -str pool -exc ms -trigraphs on  -nostdinc'

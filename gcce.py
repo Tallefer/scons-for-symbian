@@ -78,11 +78,12 @@ def create_environment( target,
     
     if gcce_options is None:
         gcce_options = GCCE_OPTIMIZATION_FLAGS
-        
-    if targettype in DLL_TARGETTYPES:
-        defines.append( "__DLL__" )
-    else:
-        defines.append( "__EXE__" )
+    
+    if targettype != TARGETTYPE_LIB:
+        if targettype in DLL_TARGETTYPES:
+            defines.append( "__DLL__" )
+        else:
+            defines.append( "__EXE__" )
         
     defines.extend( DEFAULT_GCCE_DEFINES )
     defines.extend( CMD_LINE_DEFINES )

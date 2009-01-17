@@ -107,12 +107,9 @@ class PKGHandler:
         pkgargs = self.PackageArgs( package )
         
         template = self.pkg_template.get(pkgfilename, None)
-        
-        # 2-tuple containing preppy template and data
-        if None not in template:
+                
+        if template is not None:
             import preppy # Import here. Slow so imported only if needed.
-                        
-            template, data = template
             
             # Get contents if file
             if os.path.isfile(template):
@@ -124,6 +121,7 @@ class PKGHandler:
             m = preppy.getModule("pkg", sourcetext=template)
             outputfile = open( pkgfilename, 'wb')
             
+            data = {}
             data["files"] = files
             data.update( pkgargs )
             print( "scons: Generating pkg '%s' from preppy template " % pkgfilename )

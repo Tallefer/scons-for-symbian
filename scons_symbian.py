@@ -52,7 +52,7 @@ def _create_environment( *args, **kwargs ):
 def SymbianPackage( package, ensymbleargs = None, pkgargs = None,
                     pkgfile = None, extra_files = None, source_package = None,
                     env=None, startonboot = None,
-                    pkgtemplate = None, preppydata = None):
+                    pkgtemplate = None ):
     """
     Create Symbian Installer( sis ) file. Can use either Ensymble or pkg file.
     To enable creation, give command line arg: dosis=true
@@ -80,11 +80,9 @@ def SymbianPackage( package, ensymbleargs = None, pkgargs = None,
     @param startonboot: Name of the executable to be started on boot
     @type startonboot: str
     
-    @param pkgtemplate: preppy template for generating pkg.
-    @type pkgtemplate: str
-    
-    @param preppydata: Dictionary containing the data used with pkg template
-    @type  preppydata: dict
+    @param pkgtemplate: preppy template for generating pkg. 
+                        'pkgargs' contains the available variables in template.
+    @type pkgtemplate: str    
     
     @param extra_files: Copy files to package folder and install for simulator( to SIS with Ensymble only )
     """                     
@@ -120,7 +118,7 @@ def SymbianPackage( package, ensymbleargs = None, pkgargs = None,
                         
         PKG_HANDLER.PackageArgs( package ).update( pkgargs )
         PKG_HANDLER.pkg_sis[pkgfile] = source_package
-        PKG_HANDLER.pkg_template[pkgfile] = (pkgtemplate,preppydata)        
+        PKG_HANDLER.pkg_template[pkgfile] = (pkgtemplate)        
          
         Command( pkgfile, PKG_HANDLER.pkg_files[package].keys(),
                         PKG_HANDLER.GeneratePkg, ENV = os.environ )
@@ -460,10 +458,10 @@ class SymbianProgramHandler(object):
             elif not inlist and COMPONENTS_EXCLUDE:
                 pass
             else:
-                print "Ignored Symbian component", component_name
+                print "Ignored Symbian component %s(%s)" % ( component_name, self.uid3 )
                 return False
         
-        print "Getting dependencies for", component_name
+        print "Getting dependencies for %s(%s)" % ( component_name, self.uid3 )
         
         return True
     
@@ -1030,8 +1028,12 @@ class SymbianProgramHandler(object):
         # Seems to work again without. What is going on here? Updated scons 1.1?
         #self.extra_depends.extend( self.sources )
         
-        if type(self.sources[0]) != str:
-            self.sources = [ x.path for x in self.sources ]
+        # Convert File typed objects to str
+        # TODO: It would be better if we convert str to File instead
+        for x in xrange(len(self.sources)):
+            if type(self.sources[x]) != str:
+                self.sources[x] = self.sources[x].path 
+        #self.sources = [ x.path for x in self.sources ]
         self.origsources = self.sources[:]
         
         tmp = []
@@ -1073,7 +1075,7 @@ class SymbianProgramHandler(object):
         for count in updirs:
             out_updir = "/" + "/".join( ["_up_"] * count )
             src_updir = "/".join( [".."] * count )
-            print self.output_folder + out_updir, src_updir
+            #print self.output_folder + out_updir, src_updir
             self._env.VariantDir( self.output_folder + out_updir, src_updir, duplicate = DO_DUPLICATE_SOURCES )
         
         
