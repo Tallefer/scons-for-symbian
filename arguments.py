@@ -87,6 +87,11 @@ PACKAGE_FOLDER = abspath( join( "%s_%s" % ( COMPILER, RELEASE ), "packages" ) )
 GCCE_OPTIMIZATION_FLAGS = GetArg( "gcce_options", "GCCE compiler options.",
                                     GCCE_OPTIMIZATION_FLAGS,
                                     caseless = False )
+#: Compiler flags for GCCE
+WINSCW_OPTIMIZATION_FLAGS = GetArg( "winscw_options", "WINSCW compiler options.",
+                                    WINSCW_OPTIMIZATION_FLAGS,
+                                    caseless = False )
+
 
 MMP_EXPORT_ENABLED = GetArg( "mmpexport", "Enable MMP export(if configured).", "false", [ "true", "false"] )
 MMP_EXPORT_ENABLED = MMP_EXPORT_ENABLED == "true"

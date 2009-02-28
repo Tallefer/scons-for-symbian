@@ -74,6 +74,7 @@ def create_environment( target,
                         libraries,
                         epocheapsize = None,
                         epocstacksize = None,
+                        winscw_options = None,
                         *args,
                         **kwargs  
                         ):
@@ -81,6 +82,9 @@ def create_environment( target,
     @param kwargs: ignored keyword arguments.
     @see: L{scons_symbian.SymbianProgram}
     """
+    
+    if winscw_options is None:
+        winscw_options = WINSCW_OPTIMIZATION_FLAGS
     
     defines = kwargs["defines"][:]
     for x in xrange( len( libraries ) ):
@@ -104,7 +108,9 @@ def create_environment( target,
             defines.append( "__EXE__" )
     defines = [ '"%s"' % x for x in defines ]
 
-    WINSCW_CC_FLAGS = '-g -O0 -inline off -wchar_t off -align 4 -warnings on -w nohidevirtual,nounusedexpr -msgstyle gcc -enum int -str pool -exc ms -trigraphs on  -nostdinc'
+    cc_flags = '-g -O0 -inline off -wchar_t off -align 4 -warnings on -w nohidevirtual,nounusedexpr -msgstyle gcc -enum int -str pool -exc ms -trigraphs on  -nostdinc'
+    cc_flags = " ".join( [cc_flags, winscw_options ] )
+    
      #%(EPOCROOT)sepoc32/RELEASE/WINSCW/UDEB/euser.lib %(EPOCROOT)sepoc32/release/WINSCW/UDEB/efsrv.lib
     LINKFLAGS = ""
     if targettype in DLL_TARGETTYPES:
@@ -186,7 +192,7 @@ def create_environment( target,
 
                     CPPPATH = includes,
                     CPPDEFINES = defines,
-                    CCFLAGS = WINSCW_CC_FLAGS + ' -cwd source -I- %s -include "%s"' % ( sysincludes, platform_header ),
+                    CCFLAGS = cc_flags + ' -cwd source -I- %s -include "%s"' % ( sysincludes, platform_header ),
                     INCPREFIX = "-i ",
                     CPPDEFPREFIX = "-d ",
                     
@@ -211,7 +217,7 @@ def create_environment( target,
                  # Static library settings                                        
                  CPPPATH = includes,
                  CPPDEFINES = defines,
-                 CCFLAGS = WINSCW_CC_FLAGS + ' -cwd source -I- %s -include "%s"' % ( sysincludes, platform_header ),                    
+                 CCFLAGS = cc_flags + ' -cwd source -I- %s -include "%s"' % ( sysincludes, platform_header ),                    
                     
                  # Linker settings                    
                  LINKFLAGS = LINKFLAGS,

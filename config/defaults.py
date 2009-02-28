@@ -23,7 +23,7 @@ DO_CREATE_SIS = False
 # Positioning module stops working on PyS60 ==> removed.
 # -O2 -fno-unit-at-a-time"
 GCCE_OPTIMIZATION_FLAGS = ""
-
+WINSCW_OPTIMIZATION_FLAGS = ""
 
 if os.name == "posix":    
     EPOCROOT = ""
