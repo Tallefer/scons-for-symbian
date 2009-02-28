@@ -615,9 +615,10 @@ class SymbianProgramHandler(object):
         #postcommands.append( Copy( installpath, copysource ) )
         #installed.append( installpath )
         
-        returned_command = env.Command( installed, #IGNORE:W0612
-                                        copysource,
-                                        postcommands )
+        if len(installed) > 0:
+            env.Command( installed, #IGNORE:W0612
+                         copysource,
+                         postcommands )
         
         if self.targettype != TARGETTYPE_LIB:
             ToPackage( env, self.package_drive_map, self.package,
@@ -746,7 +747,7 @@ class SymbianProgramHandler(object):
             
             # Create final binary and lib/dso
             env.Elf( resultables, temp_dll_path )#IGNORE:E1101
-            #import pdb;pdb.set_trace()
+            
             env.Install( EPOCROOT + r"epoc32/release/gcce/%s" % ( RELEASE ),
                          ".".join( [resultables[0], self.targettype] ) )
         else:
@@ -829,20 +830,24 @@ class SymbianProgramHandler(object):
                 definput = '-Frzfile "%s" ' % definput
             else:
                 definput = ""
-
+            
+            tmplib  = self._target_resultable % "._tmp_lib"
+            inffile = '-Inffile "%s" ' % ( self._target_resultable % ".inf" )
+            defout  = ( self._target_resultable % '.def' )
+            # Creates def file
+            makedef = r'perl -S %%EPOCROOT%%epoc32/tools/makedef.pl -absent __E32Dll %s %s "%s"' % \
+                    ( inffile, definput, defout )
+                    
             action = "\n".join( [
                 # Creates <target>.lib
-                'mwldsym2.exe -S -show only,names,unmangled,verbose -o "%s" "%s"' % ( self._target_resultable % ".inf", self._target_resultable % "._tmp_lib" ),
-                # Creates def file
-                r'perl -S %EPOCROOT%epoc32/tools/makedef.pl -absent __E32Dll ' + '-Inffile "%s" ' % ( self._target_resultable % ".inf" )
- + definput
- + ' "%s"' % ( self._target_resultable % '.def' ) ] )
+                'mwldsym2.exe -S -show only,names,unmangled,verbose -o "%s" "%s"' % ( self._target_resultable % ".inf", self._target_resultable % "._tmp_lib" ),                
+                makedef
+                 ] )
 
             defbld = Builder( action = action,
                               ENV = os.environ )
             env.Append( BUILDERS = {'Def' : defbld} )
-            env.Def( self._target_resultable % ".def", #IGNORE:E1101
-                     self._target_resultable % "._tmp_lib" )
+            env.Def( defout, tmplib )
 
         # NOTE: If build folder is changed this does not work anymore.
         # List compiled sources and add to dependency list
@@ -985,7 +990,7 @@ class SymbianProgramHandler(object):
             self.libraries.extend( CMD_LINE_LIBS )
         
         if self.capabilities is None:
-            self.capabilities = FREE_CAPS
+            self.capabilities = CAPS_SELF_SIGNED
         
         # Handle UIDs
         if self.uid2 is None:

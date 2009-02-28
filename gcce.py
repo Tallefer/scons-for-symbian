@@ -100,6 +100,8 @@ def create_environment( target,
 
         if ".dso" in lib.lower():
             libraries[x] = LIBPATH + lib
+        elif lib.endswith(".o"): # Allows prebuilt object files
+            pass
         else:
             libraries[x] = SYMBIAN_ARMV5_LIBPATHLIB + lib
             

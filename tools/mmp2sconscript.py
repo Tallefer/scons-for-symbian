@@ -23,7 +23,7 @@ target     = "{{target}}"
 targettype = "{{targettype}}"
 libraries  = {{library}} 
 # Static libs
-libraries += {{staticlibrary}}
+staticlibs = {{staticlibrary}}
 
 {{script}}
 if uid[1] is None: uid[1] = 0x0 
@@ -35,6 +35,17 @@ s=StringIO()
 pprint( source, s )
 source = s.getvalue()
 s.close()
+
+s=StringIO()
+pprint( includes, s )
+includes = s.getvalue()
+s.close()
+
+s=StringIO()
+pprint( sysincludes, s )
+sysincludes = s.getvalue()
+s.close()
+
 {{endscript}}
 
 sources = {{source}}
@@ -47,7 +58,7 @@ SymbianProgram( target, targettype,
     sources = sources,
     includes    = includes,
     sysincludes = sysincludes,
-    libraries   = libraries,
+    libraries   = staticlibs+libraries,
     defines     = defines,
     epocstacksize = {{epocstacksize}},
     epocheapsize  = ({{",".join(epocheapsize)}}),
