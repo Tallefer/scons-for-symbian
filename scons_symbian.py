@@ -233,7 +233,7 @@ def SymbianPackage( package, ensymbleargs = None, pkgargs = None,
             key  = pkgargs.get("key", None)
             if cert and key:
                 sisx = package.split(".")
-                sisx = ".".join( sisx[:-1] ) + SIGNSIS_OUTPUT_EXTENSION                
+                sisx = ".".join( sisx[:-1] ) + constants.SIGNSIS_OUTPUT_EXTENSION                
                 env.Depends( sisx, package )
                 env.Depends( sisx, PKG_HANDLER.pkg_files[package].keys() + result )
                 

@@ -60,5 +60,5 @@ UI_PLATFORMS    = [UI_PLATFORM_S60, UI_PLATFORM_UIQ]
 UI_PLATFORM = ""
 
 # Extension added to sis files signed with signsis.
-SIGNSIS_OUTPUT_EXTENSION = "_signed.sisx"
+SIGNSIS_OUTPUT_EXTENSION = ".sisx"
             
