@@ -45,7 +45,10 @@ def relpath(p1, p2):
         p = [ '..' ] * len(l1)
         
     p = p + l2
-    return "/".join( p )
+    result = "/".join( p )
+    if result == "":
+        result = "."
+    return result
 
 def test(p1,p2):
     print "from", p1, "to", p2, " -> ", relpath(p1, p2)
