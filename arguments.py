@@ -63,6 +63,9 @@ if sys.platform == "win32":
 else:
     os.environ["EPOCROOT"] = EPOCROOT
 
+PYTHON_COMPILER = GetArg("pycompiler", "Enable Python source compilation into bytecode. Points to Python executable.", None )
+PYTHON_DOZIP    = GetArg("pythondozip", "Zip all python sources into a single archive. Path to the file on device", None )
+ 
 _p = os.environ["PATH"]
 #CSL_ARM_TOOLCHAIN_FOLDER_NAME = "CSL Arm Toolchain\\bin"
 #if sys.platform == "linux2":

@@ -6,6 +6,7 @@ from SCons.Builder import Builder
 from SCons.Script import (Command, Copy, DefaultEnvironment, Install, Mkdir, Clean, Default)
 from arguments import * #IGNORE:W0611
 from os.path import join, basename, abspath
+import re
 import mmp_parser
 import colorizer
 import gcce
@@ -257,13 +258,37 @@ def SymbianHelp( source, uid, env = None ):
         
     helpresult = cshlp.CSHlp( DefaultEnvironment(), source, uid )
     return helpresult
+
+def Python2ByteCode( env, source ):
+    """ Utility to compile Python source into a byte code """
     
+    target = source.replace(".py", ".pyc")
+    
+    def compile(target,source,env):
+        """ Compile python sources to .pyc using selected python compiler """
+        cmd = r"""%s -OO -c "import py_compile as p;"""
+        
+        files = zip(source,target)
+        # .pyo won't work with pys60 so ensure it's pyc
+        for x in files:
+            cmd += "p.compile(r'%s',cfile=r'%s');" % x
+            
+        cmd += '"'    
+        cmd = cmd % ( PYTHON_COMPILER )
+        return os.system(cmd)
+        
+    Command( [target], [source], compile )
+    
+    return target
+
 #: Holds the file source->target paths for each package
 #: This information is be used to generate the pkg file.
 PKG_HANDLER = symbian_pkg.PKGHandler()
 
-def ToPackage( env = None, package_drive_map = None, package = None,
-               target = None, source = None, toemulator = True ):
+def ToPackage( env = None,     package_drive_map = None, 
+               package = None, target = None, 
+               source = None,  toemulator = True,
+               dopycompile = True ):
     """Insert file into package.
     @param env: Environment. DefaultEnvironment() used if None.
         
@@ -276,7 +301,9 @@ def ToPackage( env = None, package_drive_map = None, package = None,
     @param target: Folder on device
     @param source: Source path of the file    
     @param toemulator: Flag to determine if the file is installed for SDK's emulator.
-    
+    @param dopycompile: Enable or disable python byte-code compilation.
+                        arguments.PYTHON_COMPILER must be set to enable. 
+                        This can be used to compile only certain files.
     """
     for attr in ["target", "source"]:
         notnone = locals()[attr]
@@ -289,9 +316,12 @@ def ToPackage( env = None, package_drive_map = None, package = None,
     # Just skip this then    
     if package is None:
         return
-        
-    import re
-    # WARNING: Copying to any/c/e is custom Ensymble feature.
+    
+    # Convert python source into a byte code    
+    if dopycompile and PYTHON_COMPILER and source.endswith(".py"):                
+        source = Python2ByteCode(env, source )        
+    
+    # WARNING: Copying to any/c/e is custom Ensymble feature of PyS60 CE
     drive = ""
     
     # Gets reference.
@@ -322,7 +352,9 @@ def ToPackage( env = None, package_drive_map = None, package = None,
         pkg[pkgsource] = join( "any", target, basename( source ) )    
     
     # Do the copy
-    cmd = env.Install( join( PACKAGE_FOLDER, package, drive, target ), source )  
+    package_target = join( PACKAGE_FOLDER, package, drive, target ) 
+    
+    cmd = env.Install( package_target, source )  
     Clean( cmd,join( PACKAGE_FOLDER, package) )    
        
     if toemulator and COMPILER == COMPILER_WINSCW:

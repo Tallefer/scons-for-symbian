@@ -66,7 +66,45 @@ def make_capability_hex(capabilities):
     return "0x" + hex(result)[2:].zfill(8)
 
 _WINSCW_ENV = None
-                        
+
+def make_default_environment():
+    global _WINSCW_ENV 
+    if _WINSCW_ENV is not None:
+        return _WINSCW_ENV.Clone()
+    
+    platform_header = PLATFORM_HEADER#os.path.basename( PLATFORM_HEADER )
+    #import pdb;pdb.set_trace()
+    sysincludes = " "
+    cc_flags = '-g -O0 -inline off -wchar_t off -align 4 -warnings on -w nohidevirtual,nounusedexpr -msgstyle gcc -enum int -str pool -exc ms -trigraphs on  -nostdinc'
+    _WINSCW_ENV = Environment( 
+                    tools = ["mingw"], # Disable searching of tools
+                    
+                    CC = r'mwccsym2',
+                    CXX = r'mwccsym2',
+                    
+                    ENV = os.environ, #os.environ['PATH'],
+                    # Static library settings
+                    AR = r'mwldsym2',
+                    ARFLAGS = "-library -msgstyle gcc -stdlib -subsystem windows -noimplib -o",
+                    RANLIBCOM = "",
+                    LIBPREFIX = "",
+
+                    CPPPATH = "",
+                    CPPDEFINES = DEFAULT_WINSCW_DEFINES + CMD_LINE_DEFINES,
+                    CCFLAGS = cc_flags + ' -cwd source -I- %s -include "%s"' % ( sysincludes, platform_header ),
+                    INCPREFIX = "-i ",
+                    CPPDEFPREFIX = "-d ",
+                    
+                    # Linker settings
+                    LINK = r'mwldsym2',
+                    LINKFLAGS = "",
+                    LIBS = "",
+                    LIBLINKPREFIX = " "
+
+        )
+
+    return _WINSCW_ENV
+                            
 def create_environment( target,
                         targettype,
                         includes,
@@ -204,15 +242,13 @@ def create_environment( target,
                     PROGSUFFIX = "." + targettype,
 
         )
-        #print "end"
+        
         env = _WINSCW_ENV
     else:
         # A lot faster than creating the environment from scratch
-        #print "clone"        
         env = _WINSCW_ENV.Clone()
-        #print "env"
-            
-    env.Replace( ENV = os.environ, #os.environ['PATH'],
+                    
+    env.Replace( ENV = os.environ,
                  
                  # Static library settings                                        
                  CPPPATH = includes,
