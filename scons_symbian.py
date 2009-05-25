@@ -6,6 +6,8 @@ from SCons.Builder import Builder
 from SCons.Script import (Command, Copy, DefaultEnvironment, Install, Mkdir, Clean, Default)
 from arguments import * #IGNORE:W0611
 from os.path import join, basename, abspath
+import zipfile
+import py_compile
 import re
 import mmp_parser
 import colorizer
@@ -259,26 +261,73 @@ def SymbianHelp( source, uid, env = None ):
     helpresult = cshlp.CSHlp( DefaultEnvironment(), source, uid )
     return helpresult
 
-def Python2ByteCode( env, source ):
+def _is_python_file( filepath ):
+    """ Check if file is a python file """
+    lower = filepath.lower()
+    for x in [ ".py", ".pyc", ".pyo" ]:
+        if lower.endswith( x ):
+            return True
+    return False
+
+def _zipfile(target,source,env):
+    """ """
+    zippath = target[0].abspath
+    
+    z = zipfile.ZipFile(zippath, 'w', zipfile.ZIP_DEFLATED)    
+    files = ZIP_FILES[zippath]["files"]
+    print( "Install files into archive: %s" % (zippath) )
+    for s,t in files:
+        print s,t          
+        z.write( s, t )
+    z.close()
+    
+ZIP_FILES = {}
+def File2Zip(zipfilepath, source, arcpath, env = None ):
+    """ Add a file into a zip archive """
+    
+    files = []
+    if env is None:
+        env = DefaultEnvironment()
+    
+    zipfilepath = abspath( zipfilepath )
+    
+    if zipfilepath not in ZIP_FILES:
+        #import pdb;pdb.set_trace()
+        # Create command                          
+        ZIP_FILES[zipfilepath] = { "files" : files }
+        env.Command( zipfilepath, "", _zipfile)
+    else:        
+        files = ZIP_FILES[zipfilepath]["files"] 
+    
+    env.Depends( zipfilepath, source )
+    files.append( (source, arcpath) )
+    
+    return zipfilepath
+    
+def _py2pyc(target,source,env):
+    """ Compile python sources to .pyc using selected python compiler """
+    # Can strip docstrings and enable optimizations only through command line
+    # But no matter since we could be on Py 2.6 but 2.5 is needed        
+    cmd = r"""%s -OO -c "import py_compile as p;""" % PYTHON_COMPILER
+
+    files = zip(source,target )
+    for py, pyc in files:        
+        cmd += "p.compile(r'%s',cfile=r'%s', dfile='%s');" % ( py, pyc, basename(pyc.abspath) )
+    
+    os.system( cmd )
+    return 0
+
+def Python2ByteCode( source, target = ".pyc", env = None ):
     """ Utility to compile Python source into a byte code """
     
-    target = source.replace(".py", ".pyc")
-    
-    def compile(target,source,env):
-        """ Compile python sources to .pyc using selected python compiler """
-        cmd = r"""%s -OO -c "import py_compile as p;"""
+    if target in [".pyc", ".pyo"]:
+        target = source.replace(".py", target)
         
-        files = zip(source,target)
-        # .pyo won't work with pys60 so ensure it's pyc
-        for x in files:
-            cmd += "p.compile(r'%s',cfile=r'%s');" % x
-            
-        cmd += '"'    
-        cmd = cmd % ( PYTHON_COMPILER )
-        return os.system(cmd)
-        
-    Command( [target], [source], compile )
+    if env is None:
+        env = DefaultEnvironment()
     
+    cmd = env.Command( [target], [source], _py2pyc)
+        
     return target
 
 #: Holds the file source->target paths for each package
@@ -288,7 +337,7 @@ PKG_HANDLER = symbian_pkg.PKGHandler()
 def ToPackage( env = None,     package_drive_map = None, 
                package = None, target = None, 
                source = None,  toemulator = True,
-               dopycompile = True ):
+               dopycompile = ".pyc", pylibzip = None ):
     """Insert file into package.
     @param env: Environment. DefaultEnvironment() used if None.
         
@@ -301,9 +350,21 @@ def ToPackage( env = None,     package_drive_map = None,
     @param target: Folder on device
     @param source: Source path of the file    
     @param toemulator: Flag to determine if the file is installed for SDK's emulator.
-    @param dopycompile: Enable or disable python byte-code compilation.
-                        arguments.PYTHON_COMPILER must be set to enable. 
+    @param dopycompile: Compile .py sources into .pyc or .pyo 
+                        Can be a full path.
+                        Set to None to disable byte-code compilation.
+                        arguments.PYTHON_COMPILER must be set to enable.
                         This can be used to compile only certain files.
+    @param pylibzip: If defined and source is a Python file( .py, .pyc, .pyo ), it is archived into
+                     the given file. The zip file is added automatically to pkg.
+                     The target path must be in subdirectory of the pylibzip.
+                     The file gets the remaining path inside the zip.
+                     For example: 
+                         target   = c:\libs\testing\test.py
+                         pylibzip = c:\libs\testing.zip
+                         
+                         The zip is created to the location given in pylibzip.
+                         The target is stored in the zip with path: testing\test.py
     """
     for attr in ["target", "source"]:
         notnone = locals()[attr]
@@ -319,8 +380,8 @@ def ToPackage( env = None,     package_drive_map = None,
     
     # Convert python source into a byte code    
     if dopycompile and PYTHON_COMPILER and source.endswith(".py"):                
-        source = Python2ByteCode(env, source )        
-    
+        source = Python2ByteCode( source, target = dopycompile )        
+        
     # WARNING: Copying to any/c/e is custom Ensymble feature of PyS60 CE
     drive = ""
     
@@ -343,24 +404,46 @@ def ToPackage( env = None,     package_drive_map = None,
                 drive = d
                 break
     
-    # Add to pkg generator
     pkgsource = join( PACKAGE_FOLDER, package, drive, target, basename( source ) )
-    pkg[pkgsource] = join( drive, target, basename( source ) )
-    env.Depends( symbian_pkg.GetPkgFilename( package ), join( PACKAGE_FOLDER, package, pkg[pkgsource] ) )
-    
-    if drive == "":
-        pkg[pkgsource] = join( "any", target, basename( source ) )    
-    
-    # Do the copy
-    package_target = join( PACKAGE_FOLDER, package, drive, target ) 
-    
-    cmd = env.Install( package_target, source )  
-    Clean( cmd,join( PACKAGE_FOLDER, package) )    
-       
-    if toemulator and COMPILER == COMPILER_WINSCW:
-        env.Install( join( FOLDER_EMULATOR_C, target ), source )
+    # Handle Python library zipping
+    if pylibzip is not None and _is_python_file(source):                
+        fullzippath = abspath( join( PACKAGE_FOLDER, package, drive, pylibzip ) )        
+        zipfolder   = dirname( fullzippath )
+        arcpath = abspath( pkgsource )
+        arcpath = arcpath.replace( zipfolder, "" )
         
-    return cmd
+        pkgsource = File2Zip(fullzippath, source, arcpath )  
+        
+        # Add to pkg generator
+        pkgsource = fullzippath        
+                 
+        if drive == "":
+            pkg[pkgsource] = join( "any", pylibzip )
+        else:
+            pkg[pkgsource] = join( drive, pylibzip )
+        
+        if toemulator and COMPILER == COMPILER_WINSCW:
+            env.Install( join( FOLDER_EMULATOR_C, dirname(pylibzip) ), pkgsource )
+        
+        return fullzippath
+        
+    else:                
+        # Add to pkg generator    
+        pkg[pkgsource] = join( drive, target, basename( source ) )
+    
+        env.Depends( symbian_pkg.GetPkgFilename( package ), join( PACKAGE_FOLDER, package, pkg[pkgsource] ) )                
+         
+        package_target = join( PACKAGE_FOLDER, package, drive, target )     
+        cmd = env.Install( package_target, source )  
+        Clean( cmd,join( PACKAGE_FOLDER, package) )    
+        
+        if drive == "":
+            pkg[pkgsource] = join( "any", target, basename( source ) )
+        
+        if toemulator and COMPILER == COMPILER_WINSCW:
+            env.Install( join( FOLDER_EMULATOR_C, target ), source )
+    
+    return target
 
 def SymbianProgram( target, targettype = None, #IGNORE:W0621
                     sources = None, includes = None,
