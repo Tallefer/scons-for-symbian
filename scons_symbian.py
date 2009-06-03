@@ -142,11 +142,11 @@ def SymbianPackage( package, ensymbleargs = None, pkgargs = None,
                 template_value = env.Value(pkgtemplate)
                 env.Depends( pkgfile, template_value )
         
-    if COMPILER != COMPILER_WINSCW:
-        if pkgargs is not None:     
-            if pkgfile is None:
-                pkgfile = symbian_pkg.GetPkgFilename(package)
-            create_pkg_file( pkgargs )
+        if COMPILER != COMPILER_WINSCW:
+            if pkgargs is not None:     
+                if pkgfile is None:
+                    pkgfile = symbian_pkg.GetPkgFilename(package)
+                create_pkg_file( pkgargs )
     
     def __create_boot_up_resource( target, source, env):
         """Create boot up resource file"""
