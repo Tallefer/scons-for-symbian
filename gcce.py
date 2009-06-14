@@ -58,6 +58,7 @@ def create_environment( target,
                         epocstacksize = None,
                         epocheapsize = None,
                         gcce_options = None,
+                        elf2e32_args = None,
                         **kwargs ):
     """Create GCCE building environment    
     
@@ -189,7 +190,9 @@ def create_environment( target,
 
     ELF2E32 = textwrap.dedent( ELF2E32 )
     ELF2E32 = " ".join( [ x.strip() for x in ELF2E32.split( "\n" ) ] )
-
+    if elf2e32_args is not None:
+        ELF2E32 += " " + elf2e32_args
+        
     defconfig = ""
     # Based on targettype
     #uid1 = "0x1000007a" # Exe

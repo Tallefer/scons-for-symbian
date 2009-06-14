@@ -456,6 +456,7 @@ def SymbianProgram( target, targettype = None, #IGNORE:W0621
                     help = None,
                     sysincludes = None,
                     mmpexport = None,
+                    elf2e32_args = None,
                     # Sis stuff
                     package = "",
                     package_drive_map = None,
@@ -510,6 +511,9 @@ def SymbianProgram( target, targettype = None, #IGNORE:W0621
     
     @param rssdefines: Preprocessor definitions for resource compiler.
     @type rssdefines: list
+    
+    @param elf2e32_args: Extra arguments to elf2e32 Symbian Post Linker
+    @param elf2e32_args: str
     
     @param package:       Path to installer file. If given, an installer is automatically created.
                           The files are copied to L{arguments.PACKAGE_FOLDER} and
