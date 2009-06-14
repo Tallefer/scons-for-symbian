@@ -88,7 +88,7 @@ def SymbianPackage( package, ensymbleargs = None, pkgargs = None,
     @type pkgtemplate: str    
     
     @param extra_files: Copy files to package folder and install for simulator( to SIS with Ensymble only )
-    """                     
+    """ 
     # Skip processing to speed up help message                    
     if HELP_ENABLED: return
     if not env:
@@ -141,12 +141,12 @@ def SymbianPackage( package, ensymbleargs = None, pkgargs = None,
             else:
                 template_value = env.Value(pkgtemplate)
                 env.Depends( pkgfile, template_value )
-        
-        if COMPILER != COMPILER_WINSCW:
-            if pkgargs is not None:     
-                if pkgfile is None:
-                    pkgfile = symbian_pkg.GetPkgFilename(package)
-                create_pkg_file( pkgargs )
+    # Create pkg file
+    if COMPILER != COMPILER_WINSCW:
+        if pkgargs is not None:     
+            if pkgfile is None:
+                pkgfile = symbian_pkg.GetPkgFilename(package)
+            create_pkg_file( pkgargs )
     
     def __create_boot_up_resource( target, source, env):
         """Create boot up resource file"""
@@ -204,9 +204,9 @@ def SymbianPackage( package, ensymbleargs = None, pkgargs = None,
     _makeBootUpResource()
                 
     def create_install_file( installed ):
-        "Utility for creating an installation package using Ensymble"
+        """Utility for creating an installation package using Ensymble or PKG template"""
         from ensymble.cmd_simplesis import run as simplesis
-                
+        
         if pkgfile is None and ENSYMBLE_AVAILABLE:
                                 
             def ensymble( env, target = None, source = None ): #IGNORE:W0613
@@ -654,7 +654,7 @@ class SymbianProgramHandler(object):
             tmp = ""
             icon_name = x
             source_icon = x
-            #import pdb;pdb.set_trace()
+            
             if type( x ) == tuple:
                 icon_name = x[1]
                 source_icon = x[0]
@@ -712,7 +712,7 @@ class SymbianProgramHandler(object):
         # Combine with installfolder copying. 
         #TODO: Not needed anymore since EPOCROOT is default target.
         postcommands = []
-        copysource = self._target_resultable % ( "." + self.targettype )
+        copysource = self._result_template % ( "." + self.targettype )
         target_filename = self.target + "." + self.targettype
         sdkpath = join( SDKFOLDER, target_filename )
 
@@ -843,9 +843,9 @@ class SymbianProgramHandler(object):
     
     def _handleGCCEBuild(self):
         env = self._env
-        output_lib = ( self.targettype in DLL_TARGETTYPES )
-        temp_dll_path = self._target_resultable % ( "._tmp_" + self.targettype )
-        resultables = [ temp_dll_path ]
+        output_lib   = ( self.targettype in DLL_TARGETTYPES )
+        elf_dll_path = self._result_template % ( "._elf_" + self.targettype )
+        resultables  = [ elf_dll_path  ]
         
         if output_lib:
             libname = self.target + ".dso"
@@ -860,18 +860,18 @@ class SymbianProgramHandler(object):
                 env.Depends( build_prog, libname )
                 
             # Mark the lib as a resultable also
-            resultables = [ self._target_resultable % ( "" ) ]
+            resultables = [ self._result_template % ( "" ) ]
             if output_lib:
                 resultables.append( self.output_libpath )
             
             # Create final binary and lib/dso
-            env.Elf( resultables, temp_dll_path )#IGNORE:E1101
+            env.Elf( resultables, elf_dll_path )#IGNORE:E1101
             
             env.Install( EPOCROOT + r"epoc32/release/gcce/%s" % ( RELEASE ),
                          ".".join( [resultables[0], self.targettype] ) )
         else:
-            build_prog = env.StaticLibrary( self._target_resultable % ".lib" , self.sources )#IGNORE:E1101
-            self.output_libpath = ( self._target_resultable % ".lib",
+            build_prog = env.StaticLibrary( self._result_template % ".lib" , self.sources )#IGNORE:E1101
+            self.output_libpath = ( self._result_template % ".lib",
                                     EPOCROOT + r"epoc32/release/armv5/%s/%s.lib" % ( RELEASE, self.target ) )
             
         return build_prog
@@ -898,7 +898,7 @@ class SymbianProgramHandler(object):
         
         if self.targettype != TARGETTYPE_LIB:        
             # Create <target>.UID.CPP from template---------------------------------
-            uid_cpp_filename = self._target_resultable % ".UID.cpp"
+            uid_cpp_filename = self._result_template % ".UID.cpp"
             #self._createUIDCPP( [env.File( uid_cpp_filename)], None, env )
             
             # TODO: Move to winscw.py
@@ -918,16 +918,16 @@ class SymbianProgramHandler(object):
 
         # Compile the sources. Create object files( .o ) and temporary dll.
         output_lib = ( self.targettype in DLL_TARGETTYPES )
-        temp_dll_path = self._target_resultable % ( "._tmp_" + self.targettype )
+        temp_dll_path = self._result_template % ( "._tmp_" + self.targettype )
         resultables = [ temp_dll_path ]
 
         if output_lib:
             # No libs from exes
             libname = self.target + ".lib"
-            resultable_path = self._target_resultable % "._tmp_lib"
+            resultable_path = self._result_template % "._tmp_lib"
             resultables.append( resultable_path )
-            #resultables.append( self._target_resultable % ".inf" )
-            self.output_libpath = ( self._target_resultable % ".lib",
+            #resultables.append( self._result_template % ".inf" )
+            self.output_libpath = ( self._result_template % ".lib",
                                 join( EPOC32_RELEASE, libname ) )
         
         if self.targettype != TARGETTYPE_LIB:
@@ -938,8 +938,8 @@ class SymbianProgramHandler(object):
             env.Depends( build_prog, [ join( EPOC32_RELEASE, libname ) for libname in self.libraries] )
             
         else:
-            build_prog = env.StaticLibrary( self._target_resultable % ".lib" , self.sources )#IGNORE:E1101
-            self.output_libpath = ( self._target_resultable % ".lib",
+            build_prog = env.StaticLibrary( self._result_template % ".lib" , self.sources )#IGNORE:E1101
+            self.output_libpath = ( self._result_template % ".lib",
                                 join( EPOC32_RELEASE, "%s.lib" % ( self.target ) ) )
         
         if output_lib and self.targettype != TARGETTYPE_LIB:
@@ -950,16 +950,16 @@ class SymbianProgramHandler(object):
             else:
                 definput = ""
             
-            tmplib  = self._target_resultable % "._tmp_lib"
-            inffile = '-Inffile "%s" ' % ( self._target_resultable % ".inf" )
-            defout  = ( self._target_resultable % '.def' )
+            tmplib  = self._result_template % "._tmp_lib"
+            inffile = '-Inffile "%s" ' % ( self._result_template % ".inf" )
+            defout  = ( self._result_template % '.def' )
             # Creates def file
             makedef = r'perl -S %%EPOCROOT%%epoc32/tools/makedef.pl -absent __E32Dll %s %s "%s"' % \
                     ( inffile, definput, defout )
                     
             action = "\n".join( [
                 # Creates <target>.lib
-                'mwldsym2.exe -S -show only,names,unmangled,verbose -o "%s" "%s"' % ( self._target_resultable % ".inf", self._target_resultable % "._tmp_lib" ),                
+                'mwldsym2.exe -S -show only,names,unmangled,verbose -o "%s" "%s"' % ( self._result_template % ".inf", self._result_template % "._tmp_lib" ),                
                 makedef
                  ] )
 
@@ -987,7 +987,7 @@ class SymbianProgramHandler(object):
     
         if self.targettype in DLL_TARGETTYPES and self.targettype != TARGETTYPE_LIB:
 
-            env.Command( self._target_resultable % ( "." + self.targettype ), [ temp_dll_path, self._target_resultable % ".def" ],
+            env.Command( self._result_template % ( "." + self.targettype ), [ temp_dll_path, self._result_template % ".def" ],
             [
                 " ".join( [
                             'mwldsym2 -msgstyle gcc',
@@ -995,8 +995,8 @@ class SymbianProgramHandler(object):
                             '-shared -subsystem windows',
                             '-g %s' % " ".join( libs ),
                             '-o "%s"' % temp_dll_path,
-                            '-f "%s"' % ( self._target_resultable % ".def" ),
-                            '-implib "%s"' % ( self._target_resultable % ".lib" ),
+                            '-f "%s"' % ( self._result_template % ".def" ),
+                            '-implib "%s"' % ( self._result_template % ".lib" ),
                             '-addcommand "out:%s.%s"' % ( self.target, self.targettype ),
                             '-warnings off',
                             '-l %s' % " -l ".join( set( object_folders ) ),
@@ -1006,7 +1006,7 @@ class SymbianProgramHandler(object):
             ]
             )
         elif self.targettype == TARGETTYPE_EXE:
-            env.Command( self._target_resultable % ".exe", temp_dll_path,
+            env.Command( self._result_template % ".exe", temp_dll_path,
                 [
                 " ".join( [ 'mwldsym2',
                             '-msgstyle gcc',
@@ -1176,8 +1176,8 @@ class SymbianProgramHandler(object):
         Mkdir( self.output_folder )
         
         # Target resultable template. Just give extension of the file
-        self._target_resultable = "%s/%s" % FOLDER_TARGET_TUPLE + "%s"
-        self._target_resultable = os.path.abspath( self._target_resultable )
+        self._result_template = "%s/%s" % FOLDER_TARGET_TUPLE + "%s"
+        self._result_template = os.path.abspath( self._result_template )
         
         # Copy the modified keywords from self ignoring private 
         kwargs = {}
@@ -1185,9 +1185,10 @@ class SymbianProgramHandler(object):
             if x.startswith("_"):
                 continue
             kwargs[x] = getattr( self, x )
-                    
+        
+        kwargs["defoutput"] = self._result_template % ( "{000a0000}.def" )
         self._env = _create_environment( **kwargs )
-                
+        
         # File duplication can be disabled with SCons's -n parameter to ease use of IDE(Carbide)
         # It seems that SCons is not always able to detect changes if duplication is disabled. 
         self._env.VariantDir( self.output_folder, ".", duplicate = DO_DUPLICATE_SOURCES )

@@ -52,6 +52,7 @@ def create_environment( target,
                         uid3,
                         sid = None,
                         definput = None,
+                        defoutput = None,
                         capabilities = None,
                         defines = None,
                         allowdlldata = True,
@@ -211,7 +212,7 @@ def create_environment( target,
         if definput is not None:
             definput = os.path.abspath( definput )
             defconfig += ["--definput " + definput]
-        defconfig += ["--defoutput " + target + "{000a0000}.def" ]
+        defconfig += ["--defoutput " + defoutput ]
         defconfig += ["--unfrozen" ]
         defconfig += ["--dso " + os.environ["EPOCROOT"] + "epoc32/release/ARMV5/LIB/" + target + ".dso"]
         defconfig = " ".join( defconfig )
