@@ -457,6 +457,8 @@ def SymbianProgram( target, targettype = None, #IGNORE:W0621
                     sysincludes = None,
                     mmpexport = None,
                     elf2e32_args = None,
+                    win32_libraries = None,
+                    win32_subsystem = None,
                     # Sis stuff
                     package = "",
                     package_drive_map = None,
@@ -515,6 +517,12 @@ def SymbianProgram( target, targettype = None, #IGNORE:W0621
     @param elf2e32_args: Extra arguments to elf2e32 Symbian Post Linker
     @param elf2e32_args: str
     
+    @param win32_libraries: Win32 libraries to link against (default None)
+    @param win32_libraries: list of str
+
+    @param win32_subsystem: Subsystem for the resulting binary (default windows)
+    @param win32_subsystem: str, either "windows" or "console"
+
     @param package:       Path to installer file. If given, an installer is automatically created.
                           The files are copied to L{arguments.PACKAGE_FOLDER} and
                           Ensymble is used to create an installer package with simplesis command.
@@ -984,6 +992,8 @@ class SymbianProgramHandler(object):
 
         libfolder = "%EPOCROOT%epoc32/release/winscw/udeb/"
         libs = [ libfolder + x for x in self.libraries]
+        win32_libs = self.win32_libraries or []
+        win32_subsystem = self.win32_subsystem or "windows"
     
         if self.targettype in DLL_TARGETTYPES and self.targettype != TARGETTYPE_LIB:
 
@@ -992,8 +1002,9 @@ class SymbianProgramHandler(object):
                 " ".join( [
                             'mwldsym2 -msgstyle gcc',
                             '-stdlib %EPOCROOT%epoc32/release/winscw/udeb/edll.lib -noentry',
-                            '-shared -subsystem windows',
+                            '-shared -subsystem ' % win32_subsystem,
                             '-g %s' % " ".join( libs ),
+                            ' %s' % " ".join( win32_libs ),
                             '-o "%s"' % temp_dll_path,
                             '-f "%s"' % ( self._result_template % ".def" ),
                             '-implib "%s"' % ( self._result_template % ".lib" ),
@@ -1012,8 +1023,9 @@ class SymbianProgramHandler(object):
                             '-msgstyle gcc',
                             '-stdlib %EPOCROOT%epoc32/release/winscw/udeb/eexe.lib',
                             '-m "?_E32Bootstrap@@YGXXZ"',
-                            '-subsystem windows',
+                            '-subsystem %s' % win32_subsystem,
                             '-g %s' % " ".join( libs ),
+                            ' %s' % " ".join( win32_libs ),
                             '-o "$TARGET"',
                             '-noimplib',
                             '-l %s' % " -l ".join( set( object_folders ) ),
