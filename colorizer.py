@@ -229,6 +229,11 @@ class OutputConsole( ConsoleBase ):
         if ( os.name == "posix" and args[0] == "wine" ):
             stdout = None
             
+        # We get unicode objects in the environment from somewhere, which makes
+        # Popen unhappy. Force the environment to strings.
+        # TODO(mika.raento): fix the source of the unicode.
+        env = dict([ (k, str(v)) for (k, v) in env.iteritems() ])
+
         p = sp.Popen( args, bufsize = 1024,
                     stdout = stdout, stderr = sp.STDOUT,
                     startupinfo = startupinfo,
