@@ -200,7 +200,7 @@ class MMPParser:
             result[x] = []
         result["epocallowdlldata"] = False # Not enabled with regular scripts either
         result["epocstacksize"].append(hex(8 * 1024))
-        result["epocheapsize"] = ( hex(1024), hex(1024*1024 ))
+        result["epocheapsize"] = ( hex(4096), hex(1024*1024 ))
         result["uid"] += [ None, None]
         for line in lines:                        
             parts = line.split()
@@ -265,4 +265,3 @@ if __name__ == "__main__":
         setattr(e.MMPData, x.upper(), mmpdata[x])
     
     print e.Export()
-    

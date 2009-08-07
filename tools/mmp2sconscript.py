@@ -21,7 +21,7 @@ from scons_symbian import *
 
 target     = "{{target}}"
 targettype = "{{targettype}}"
-libraries  = {{library}} 
+libraries  = {{library}}
 # Static libs
 staticlibs = {{staticlibrary}}
 
@@ -37,12 +37,12 @@ source = s.getvalue()
 s.close()
 
 s=StringIO()
-pprint( includes, s )
+pprint( userinclude, s )
 includes = s.getvalue()
 s.close()
 
 s=StringIO()
-pprint( sysincludes, s )
+pprint( systeminclude, s )
 sysincludes = s.getvalue()
 s.close()
 
@@ -115,4 +115,4 @@ def start():
     c.convert_mmp( options.mmp, options.sconscript )
     
 if __name__ == "__main__":    
-    start()    
+    start()
