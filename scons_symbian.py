@@ -901,6 +901,14 @@ class SymbianProgramHandler(object):
         return None
             
     def _handleWINSCWBuild(self):
+        """
+        DLL:
+        A temporary library(.lib) is created in order to generate .inf file, which in turn
+        is used to generate exports .def file with makedef.pl perl script. 
+        The .def file is used to generate the final dll.
+        
+        TODO: Remove the extra linking for EXE
+        """
         # Compile sources ------------------------------------------------------
         env = self._env
         
@@ -951,7 +959,7 @@ class SymbianProgramHandler(object):
                                 join( EPOC32_RELEASE, "%s.lib" % ( self.target ) ) )
         
         if output_lib and self.targettype != TARGETTYPE_LIB:
-            # Create .inf file
+            # Create .inf file from the .lib
             definput = self.definput
             if definput is not None:# and os.path.exists(definput):
                 definput = '-Frzfile "%s" ' % definput
