@@ -909,8 +909,6 @@ class SymbianProgramHandler(object):
         A temporary library(.lib) is created in order to generate .inf file, which in turn
         is used to generate exports .def file with makedef.pl perl script. 
         The .def file is used to generate the final dll.
-        
-        TODO: Remove the extra linking for EXE
         """
         # Compile sources ------------------------------------------------------
         env = self._env
@@ -948,8 +946,14 @@ class SymbianProgramHandler(object):
             #resultables.append( self._result_template % ".inf" )
             self.output_libpath = ( self._result_template % ".lib",
                                 join( args.INSTALL_EPOC32_RELEASE, libname ) )
+        if self.targettype == TARGETTYPE_EXE:
+            build_prog = env.Program( self._result_template % ".exe", self.sources )
+            env.Depends( build_prog, [ join( EPOC32_RELEASE, libname ) for libname in self.libraries] )
+            env.Depends( build_prog, [ join( args.INSTALL_EPOC32_RELEASE,
+                                            libname ) for libname in self.user_libraries] )
+            return
 
-        if self.targettype != args.TARGETTYPE_LIB:
+        elif self.targettype != TARGETTYPE_LIB:
             build_prog = env.Program( resultables, self.sources )#IGNORE:E1101
             # Depends on the used libraries. This has a nice effect since if,
             # this project depends on one of the other projects/components/dlls/libs
@@ -1030,26 +1034,6 @@ class SymbianProgramHandler(object):
                         )
             ]
             )
-        elif self.targettype == args.TARGETTYPE_EXE:
-            env.Command( self._result_template % ".exe", temp_dll_path,
-                [
-                " ".join( [ 'mwldsym2',
-                            '-msgstyle gcc',
-                            '-stdlib %EPOCROOT%epoc32/release/winscw/udeb/eexe.lib',
-                            '-m "?_E32Bootstrap@@YGXXZ"',
-                            '-subsystem %s' % win32_subsystem,
-                            '-g %s' % " ".join( libs ),
-                            ' %s' % " ".join( win32_libs ),
-                            '-o "$TARGET"',
-                            '-noimplib',
-                            '-l %s' % " -l ".join( set( object_folders ) ),
-                            '-search ' + objects,
-                          ]
-                        )
-                ]
-            )
-            self.output_libpath = ( self._result_template % ".exe", join( args.INSTALL_EPOC32_RELEASE, "z", "sys", "bin", "%s.exe" % ( self.target ) ) )
-
         return build_prog
 
     def _handleHelp(self):

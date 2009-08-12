@@ -114,6 +114,8 @@ def create_environment( target,
                         epocheapsize = None,
                         epocstacksize = None,
                         winscw_options = None,
+                        win32_libraries = None,
+                        win32_subsystem = None,
                         *env_args,
                         **kwargs
                         ):
@@ -122,8 +124,11 @@ def create_environment( target,
     @see: L{scons_symbian.SymbianProgram}
     """
 
-    if winscw_options is None:
-        winscw_options = WINSCW_OPTIMIZATION_FLAGS
+    winscw_options = winscw_options   or WINSCW_OPTIMIZATION_FLAGS
+    win32_subsystem = win32_subsystem or "windows"
+    win32_libraries = win32_libraries or []
+
+    libraries += win32_libraries
 
     defines = kwargs["defines"][:]
     for x in xrange( len( libraries ) ):
@@ -153,28 +158,28 @@ def create_environment( target,
      #%(EPOCROOT)sepoc32/RELEASE/WINSCW/UDEB/euser.lib %(EPOCROOT)sepoc32/release/WINSCW/UDEB/efsrv.lib
     LINKFLAGS = ""
     if targettype in DLL_TARGETTYPES:
-        LINKFLAGS = """
-                    -msgstyle gcc
-                    -stdlib "%(EPOCROOT)sepoc32/release/winscw/udeb/edll.lib"
-                    -noentry -shared
-                    -subsystem windows
-                    -g
-                    -export dllexport
-                    -m __E32Dll
-                    -nocompactimportlib
-                    -implib %(OUTPUT_FOLDER)s/%(TARGET)s._tmp_lib
-                    -addcommand "out:%(TARGET)s._tmp_%(TARGETTYPE)s"
-                    -warnings off
-                     """
+        LINKFLAGS = " ".join( [
+                    '-msgstyle gcc',
+                    '-stdlib "%s"' % join( EPOC32_RELEASE, 'edll.lib'),
+                    '-noentry -shared',
+                    '-subsystem windows',
+                    '-g',
+                    '-export dllexport',
+                    '-m __E32Dll',
+                    '-nocompactimportlib',
+                    '-implib %(OUTPUT_FOLDER)s/%(TARGET)s._tmp_lib',
+                    '-addcommand "out:%(TARGET)s._tmp_%(TARGETTYPE)s"',
+                    '-warnings off'
+                    ])
 
     elif targettype == TARGETTYPE_EXE:
-        LINKFLAGS = """
-                    -msgstyle gcc
-                    -stdlib "%(EPOCROOT)sepoc32/release/winscw/udeb/eexe.lib"
-                    -m "?_E32Bootstrap@@YGXXZ"
-                    -subsystem windows -g
-                    -noimplib
-                     """
+        LINKFLAGS = " ".join( [
+                    '-msgstyle gcc',
+                    '-stdlib ' + join( EPOC32_RELEASE, 'eexe.lib'),
+                    '-m "?_E32Bootstrap@@YGXXZ"',
+                    '-subsystem %s' % win32_subsystem,
+                    '-noimplib',
+                    ])
 
         if epocstacksize is None:
             # This is default for device builds so we'll use it here as well
@@ -204,7 +209,8 @@ def create_environment( target,
                              "TARGETTYPE" : targettype,
                              "EPOCROOT"   : EPOCROOT,
                              "COMPILER"   : COMPILER,
-                             "OUTPUT_FOLDER": OUTPUT_FOLDER }
+                             "OUTPUT_FOLDER": OUTPUT_FOLDER
+                             }
 
     platform_header = os.path.basename( PLATFORM_HEADER )
     if len( sysincludes ) > 0:
