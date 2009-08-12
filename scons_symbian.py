@@ -30,7 +30,8 @@ _OUTPUT_COLORIZER = colorizer.OutputConsole()
 
 def FinalizeSymbianScons():
   if args.ResolveInstallDirectories():
-    # Set args.EPOCROOT as default target, so the stuff will be built for emulator.
+    # Set args.INSTALL_EPOCROOT as default target, so the stuff will be
+    # built for emulator.
     Default( args.INSTALL_EPOCROOT )
     Default( "." )
 
@@ -154,7 +155,7 @@ def SymbianPackage( package, ensymbleargs = None, pkgargs = None,
 
     def __create_boot_up_resource( target, source, env):
         """Create boot up resource file"""
-        # Notice that the resource must args.ALWAYS be copied to args.C:
+        # Notice that the resource must ALWAYS be copied to args.C:
         template = r"""
         #include <startupitem.rh>
 
@@ -204,11 +205,11 @@ def SymbianPackage( package, ensymbleargs = None, pkgargs = None,
         if args.COMPILER == args.COMPILER_WINSCW:
             env.Install( join( args.INSTALL_EPOC32_DATA ), rscfilepath )
 
-    #---------------------------------------------------- Create boot up args.API resource
+    #---------------------------------------------------- Create boot up API resource
     _makeBootUpResource()
 
     def create_install_file( installed ):
-        """Utility for creating an installation package using Ensymble or args.PKG template"""
+        """Utility for creating an installation package using Ensymble or PKG template"""
         from ensymble.cmd_simplesis import run as simplesis
 
         if pkgfile is None and args.ENSYMBLE_AVAILABLE:
@@ -390,7 +391,7 @@ def ToPackage( env = None,     package_drive_map = None,
     if dopycompile and args.PYTHON_COMPILER and source.endswith(".py"):
         source = Python2ByteCode( source, target = dopycompile )
 
-    # args.WARNING: Copying to any/c/e is custom Ensymble feature of PyS60 args.CE
+    # WARNING: Copying to any/c/e is custom Ensymble feature of PyS60 args.CE
     drive = ""
 
     # Gets reference.
@@ -663,9 +664,9 @@ class SymbianProgramHandler(object):
                          args.RELEASE, "z", "resource", "apps", "%s" )
 
         icon_target_path = join( self.output_folder, "%s_aif.mif" )
-        icon_targets = [] # Icons at args.WINSCW/...
+        icon_targets = [] # Icons at WINSCW/...
         sdk_icons = [] # Icons at /epoc32
-        copyres_cmds = [] # Commands to copy icons from args.WINSCW/ to /epoc32
+        copyres_cmds = [] # Commands to copy icons from WINSCW/ to /epoc32
 
         for x in self.icons:
 
@@ -729,7 +730,7 @@ class SymbianProgramHandler(object):
         #installpath = join( installfolder, "%s.%s" % ( self.target, self.targettype ) )
 
         # Combine with installfolder copying.
-        #TODO: Not needed anymore since args.EPOCROOT is default target.
+        #TODO: Not needed anymore since args.INSTALL_EPOCROOT is default target.
         postcommands = []
         copysource = self._result_template % ( "." + self.targettype )
         target_filename = self.target + "." + self.targettype
@@ -737,7 +738,7 @@ class SymbianProgramHandler(object):
 
         installed = []
         if args.COMPILER == args.COMPILER_WINSCW:
-            # Copy to args.SDK to be used with simulator
+            # Copy to SDK to be used with simulator
             postcommands.append( Copy( sdkpath, copysource ) )
             installed.append( sdkpath )
 
@@ -846,7 +847,7 @@ class SymbianProgramHandler(object):
                         self._env.Install( join( args.INSTALL_EPOC32_DATA, "Z", "resource","apps"), converted_rsc )
                         self._env.Install( join( args.INSTALL_EPOC32_RELEASE, "Z", "resource", "apps"), converted_rsc )
 
-                # Depend on previous. TODO: Use args.SCons Preprocessor scanner.
+                # Depend on previous. TODO: Use SCons Preprocessor scanner.
                 if prev_resource is not None:
                     self._env.Depends( rss_path, prev_resource )
                 prev_resource = includepath
@@ -919,11 +920,11 @@ class SymbianProgramHandler(object):
             env.CreateUID( uid_cpp_filename, self.sources )#IGNORE:E1101
 
             # uid.cpp depends on the value of the capabilities
-            #import args.SCons.Node.Python
+            #import SCons.Node.Python
             caps_value = env.Value(self.capabilities)
             env.Depends( uid_cpp_filename, caps_value )
 
-            # We need to include the args.UID.cpp also
+            # We need to include the UID.cpp also
             self.sources.append( uid_cpp_filename )
 
         # Compile the sources. Create object files( .o ) and temporary dll.
@@ -980,7 +981,7 @@ class SymbianProgramHandler(object):
             env.Append( BUILDERS = {'Def' : defbld} )
             env.Def( defout, tmplib )
 
-        # args.NOTE: If build folder is changed this does not work anymore.
+        # NOTE: If build folder is changed this does not work anymore.
         # List compiled sources and add to dependency list
         object_paths = [ ".".join( x.split( "." )[: - 1] ) + ".o" for x in self.sources ] #IGNORE:W0631
 
@@ -1073,11 +1074,11 @@ class SymbianProgramHandler(object):
         self.uid2 = data["uid"][0]
         self.uid3 = data["uid"][1]
 
-        # Allow override in args.SConstruct
+        # Allow override in SConstruct
         if self.capabilities is None:
             self.capabilities = data["capability"]
 
-        # Allow override in args.SConstruct
+        # Allow override in SConstruct
         if self.rssdefines is None:
             self.rssdefines = data["macro"][:]
 
@@ -1132,7 +1133,7 @@ class SymbianProgramHandler(object):
         if self.capabilities is None:
             self.capabilities = args.CAPS_SELF_SIGNED
 
-        # Handle args.UIDs
+        # Handle UIDs
         if self.uid2 is None:
             if self.targettype == args.TARGETTYPE_EXE:
                 self.uid2 = "0x100039ce"
@@ -1149,7 +1150,7 @@ class SymbianProgramHandler(object):
         elif type(self.sid) != str:
             self.sid = hex(self.sid)[:-1]
 
-        # Add macros to ease changing application args.UID
+        # Add macros to ease changing application UID
         self.uiddefines = [
             "__UID3__=%s" % self.uid3
         ]
@@ -1165,7 +1166,7 @@ class SymbianProgramHandler(object):
         if not self._isComponentEnabled():
             return None
 
-        # ???: args.SCons is able to compile sources with self.output_folder
+        # ???: SCons is able to compile sources with self.output_folder
         #      but not able to detect if the files have changed without
         #      explicit dependency!! Without self.output_folder the resulting object
         #      files are stored in the same folder as sources causing cross compiling
@@ -1210,8 +1211,8 @@ class SymbianProgramHandler(object):
         kwargs["defoutput"] = self._result_template % ( "{000a0000}.def" )
         self._env = _create_environment( **kwargs )
 
-        # File duplication can be disabled with args.SCons's -n parameter to ease use of args.IDE(Carbide)
-        # It seems that args.SCons is not always able to detect changes if duplication is disabled.
+        # File duplication can be disabled with SCons's -n parameter to ease use of IDE(Carbide)
+        # It seems that SCons is not always able to detect changes if duplication is disabled.
         self._env.VariantDir( self.output_folder, ".", duplicate = args.DO_DUPLICATE_SOURCES )
 
         # Define build dir for top folders.
@@ -1238,10 +1239,10 @@ class SymbianProgramHandler(object):
         self.output_libpath = None
 
         build_prog = None
-        #---------------------------------------------------------- Build using args.GCCE
+        #---------------------------------------------------------- Build using GCCE
         if args.COMPILER == args.COMPILER_GCCE:
             build_prog = self._handleGCCEBuild()
-        #-------------------------------------------------------- Build using args.WINSCW
+        #-------------------------------------------------------- Build using WINSCW
         else:
             build_prog = self._handleWINSCWBuild()
 
@@ -1257,7 +1258,7 @@ class SymbianProgramHandler(object):
         #-------------------------------------------------------------- Copy results
         installed = self._copyResultBinary()
 
-        #---------------------------------------------------------------- Export args.MMP
+        #---------------------------------------------------------------- Export MMP
         if self.mmpexport is not None and args.MMP_EXPORT_ENABLED:
             exporter = mmp_parser.MMPExporter( self.mmpexport )
             data = exporter.MMPData
