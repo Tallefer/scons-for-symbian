@@ -1,10 +1,10 @@
 """
-Main args.S4S module
+Main S4S module
 """
 #pylint: disable-msg=E0611
 from SCons.Builder import Builder
 from SCons.Script import (Command, Copy, DefaultEnvironment, Install, Mkdir, Clean, Default)
-import arguments as args
+import arguments as ARGS
 from arguments import sysout, get_output_folder, EPOCROOT
 from os.path import join, basename, abspath
 import zipfile
@@ -28,32 +28,41 @@ __license__ = "MIT License"
 #: Handle to console for colorized output( and process launching )
 _OUTPUT_COLORIZER = colorizer.OutputConsole()
 
-def FinalizeSymbianScons():
-  if args.ResolveInstallDirectories():
-    # Set args.INSTALL_EPOCROOT as default target, so the stuff will be
+def _finalize_symbian_scons():
+  if ARGS.ResolveInstallDirectories():
+    # Set ARGS.INSTALL_EPOCROOT as default target, so the stuff will be
     # built for emulator.
-    Default( args.INSTALL_EPOCROOT )
+    Default( ARGS.INSTALL_EPOCROOT )
     Default( "." )
 
-sysout( "Building", args.COMPILER, args.RELEASE )
-sysout( "Defines", args.CMD_LINE_DEFINES )
+sysout( "Building", ARGS.COMPILER, ARGS.RELEASE )
+sysout( "Defines", ARGS.CMD_LINE_DEFINES )
 
 # in template
-# args.UID1 = 0x100039ce for exe
-# args.UID1 = 0x00000000 for dll
+# ARGS.UID1 = 0x100039ce for exe
+# ARGS.UID1 = 0x00000000 for dll
 
 def _create_environment( *env_args, **kwargs ):
     """Environment factory. Get correct environment for selected compiler."""
     env = None
 
-    if args.COMPILER == args.COMPILER_GCCE:
+    if ARGS.COMPILER == ARGS.COMPILER_GCCE:
         env = gcce.create_environment( *env_args, **kwargs )
-    elif args.COMPILER == args.COMPILER_WINSCW:
+    elif ARGS.COMPILER == ARGS.COMPILER_WINSCW:
         env = winscw.create_environment( *env_args, **kwargs )
     else:
-        msg = "Error: Environment for '%s' is not implemented" % args.COMPILER
+        msg = "Error: Environment for '%s' is not implemented" % ARGS.COMPILER
         raise NotImplementedError( msg )
     return env
+
+def SetInstallDirectory(dir):
+  """
+  SetInstallDirectory can be called to put the final output (binaries, resource
+  files, .libs and headers) somewhere else than the SDK folder so that builds
+  don't pollute the SDK. Apps can be started by pointing a virtual MMC to this
+  directory (with _EPOC_DRIVE_E environment variable or epoc.ini setting).
+  """
+  ARGS.SetInstallDirectory(dir)
 
 
 def SymbianPackage( package, ensymbleargs = None, pkgargs = None,
@@ -67,11 +76,11 @@ def SymbianPackage( package, ensymbleargs = None, pkgargs = None,
     @param package: Name of the package.
     @type package: str
 
-    @param pkgargs: Arguments to args.PKG generation. Disabled if none, use empty dict for simple enable.
+    @param pkgargs: Arguments to PKG generation. Disabled if none, use empty dict for simple enable.
                     To enable signing, give at least both cert and keys, which point to the
                     respective files. passwd key can be used for password.
                     If pkgfile is not given, package name is converted to pkg extension and used instead.
-                    The signed sis file gets extension args.SIGNSIS_OUTPUT_EXTENSION defined in constants.py
+                    The signed sis file gets extension SIGNSIS_OUTPUT_EXTENSION defined in constants.py
 
     @type pkgargs: dict
 
@@ -91,16 +100,16 @@ def SymbianPackage( package, ensymbleargs = None, pkgargs = None,
                         'pkgargs' contains the available variables in template.
     @type pkgtemplate: str
 
-    @param extra_files: Copy files to package folder and install for simulator( to args.SIS with Ensymble only )
+    @param extra_files: Copy files to package folder and install for simulator( to SIS with Ensymble only )
     """
     # Skip processing to speed up help message
-    if args.HELP_ENABLED: return
-    FinalizeSymbianScons()
+    if ARGS.HELP_ENABLED: return
+    _finalize_symbian_scons()
     if not env:
         env = DefaultEnvironment()
 
     if ensymbleargs is not None and pkgargs is not None:
-        raise ValueError( "Trying to use both Ensymble and args.PKG file. Which one do you really want?" )
+        raise ValueError( "Trying to use both Ensymble and ARGS.PKG file. Which one do you really want?" )
     else:
         if ensymbleargs is None:
             ensymbleargs = {}
@@ -116,8 +125,8 @@ def SymbianPackage( package, ensymbleargs = None, pkgargs = None,
 
             ToPackage( DefaultEnvironment(), None, package, target, source, toemulator = False )
 
-            if args.COMPILER == args.COMPILER_WINSCW:
-                Install( join( args.FOLDER_EMULATOR_C, target ), source )
+            if ARGS.COMPILER == ARGS.COMPILER_WINSCW:
+                Install( join( ARGS.INSTALL_EMULATOR_C, target ), source )
 
     def create_pkg_file( pkgargs ):
 
@@ -147,7 +156,7 @@ def SymbianPackage( package, ensymbleargs = None, pkgargs = None,
                 template_value = env.Value(pkgtemplate)
                 env.Depends( pkgfile, template_value )
     # Create pkg file
-    if args.COMPILER != args.COMPILER_WINSCW:
+    if ARGS.COMPILER != ARGS.COMPILER_WINSCW:
         if pkgargs is not None:
             if pkgfile is None:
                 pkgfile = symbian_pkg.GetPkgFilename(package)
@@ -155,14 +164,14 @@ def SymbianPackage( package, ensymbleargs = None, pkgargs = None,
 
     def __create_boot_up_resource( target, source, env):
         """Create boot up resource file"""
-        # Notice that the resource must ALWAYS be copied to args.C:
+        # Notice that the resource must ALWAYS be copied to C:
         template = r"""
         #include <startupitem.rh>
 
-        args.RESOURCE STARTUP_ITEM_INFO startexe
+        RESOURCE STARTUP_ITEM_INFO startexe
         {
             executable_name = "c:\\sys\\bin\\%(APPNAME)s";
-            recovery = args.EStartupItemExPolicyNone;
+            recovery = ARGS.EStartupItemExPolicyNone;
         }
         """
 
@@ -180,7 +189,7 @@ def SymbianPackage( package, ensymbleargs = None, pkgargs = None,
 
         if not startonboot: return
 
-        output_folder = get_output_folder( args.COMPILER, args.RELEASE, startonboot, "rss" )
+        output_folder = get_output_folder( ARGS.COMPILER, ARGS.RELEASE, startonboot, "rss" )
 
         uid = PKG_HANDLER.PackageArgs(package)["uid"]
 
@@ -195,15 +204,15 @@ def SymbianPackage( package, ensymbleargs = None, pkgargs = None,
         rcomp.RComp( env, rscfilepath, rsgfilepath,
                              rssfilepath,
                              "-v -m045,046,047",
-                             args.SYSTEM_INCLUDES,
-                             [args.PLATFORM_HEADER],
+                             ARGS.SYSTEM_INCLUDES,
+                             [ARGS.PLATFORM_HEADER],
                              [ 'LANGUAGE_SC'])
 
         ToPackage(env, { "C" : ".*[.](rsc)" }, package,
                   "private/101f875a/import/", rscfilepath, toemulator=False)
 
-        if args.COMPILER == args.COMPILER_WINSCW:
-            env.Install( join( args.INSTALL_EPOC32_DATA ), rscfilepath )
+        if ARGS.COMPILER == ARGS.COMPILER_WINSCW:
+            env.Install( join( ARGS.INSTALL_EPOC32_DATA ), rscfilepath )
 
     #---------------------------------------------------- Create boot up API resource
     _makeBootUpResource()
@@ -212,7 +221,7 @@ def SymbianPackage( package, ensymbleargs = None, pkgargs = None,
         """Utility for creating an installation package using Ensymble or PKG template"""
         from ensymble.cmd_simplesis import run as simplesis
 
-        if pkgfile is None and args.ENSYMBLE_AVAILABLE:
+        if pkgfile is None and ARGS.ENSYMBLE_AVAILABLE:
 
             def ensymble( env, target = None, source = None ): #IGNORE:W0613
                 """ Wrap ensymble simplesis command. """
@@ -220,7 +229,7 @@ def SymbianPackage( package, ensymbleargs = None, pkgargs = None,
                 for x in ensymbleargs:
                     cmd += [ "%s=%s" % ( x, ensymbleargs[x] ) ]
 
-                cmd += [ join( args.PACKAGE_FOLDER, package ), package ]
+                cmd += [ join( ARGS.PACKAGE_FOLDER, package ), package ]
 
                 try:
                     print "Running simplesis:" + str( cmd )
@@ -237,30 +246,30 @@ def SymbianPackage( package, ensymbleargs = None, pkgargs = None,
                                           package,
                                           installed = PKG_HANDLER.pkg_files[package].keys() )
 
-            cert = pkgargs.get("cert", None )
-            key  = pkgargs.get("key", None)
+            cert = pkgARGS.get("cert", None )
+            key  = pkgARGS.get("key", None)
             if cert and key:
                 sisx = package.split(".")
                 sisx = ".".join( sisx[:-1] ) + constants.SIGNSIS_OUTPUT_EXTENSION
                 env.Depends( sisx, package )
                 env.Depends( sisx, PKG_HANDLER.pkg_files[package].keys() + result )
 
-                passwd = pkgargs.get( "passwd", "" )
+                passwd = pkgARGS.get( "passwd", "" )
                 result.append( symbian_pkg.SignSis( sisx, package, pkgargs["cert"], pkgargs["key"], passwd ) )
 
-    if args.DO_CREATE_SIS:
+    if ARGS.DO_CREATE_SIS:
         return create_install_file( PKG_HANDLER.Package(package).keys() )
 
 def SymbianHelp( source, uid, env = None ):
     """ Generate help files for Context Help
     @param source: Help project file .cshlp"
-    @uid: args.UID of the application.
+    @uid: UID of the application.
 
     @return: generated .hlp and .hrh files.
     @rtype: 2-tuple
     """
     import cshlp
-    FinalizeSymbianScons()
+    _finalize_symbian_scons()
     if env is None:
         env = DefaultEnvironment()
 
@@ -280,7 +289,7 @@ def _zipfile(target,source,env):
     zippath = target[0].abspath
 
     z = zipfile.ZipFile(zippath, 'w', zipfile.ZIP_DEFLATED)
-    files = args.ZIP_FILES[zippath]["files"]
+    files = ARGS.ZIP_FILES[zippath]["files"]
     print( "Install files into archive: %s" % (zippath) )
     for s,t in files:
         print s,t
@@ -292,19 +301,19 @@ def File2Zip(zipfilepath, source, arcpath, env = None ):
     """ Add a file into a zip archive """
 
     files = []
-    FinalizeSymbianScons()
+    _finalize_symbian_scons()
     if env is None:
         env = DefaultEnvironment()
 
     zipfilepath = abspath( zipfilepath )
 
-    if zipfilepath not in args.ZIP_FILES:
+    if zipfilepath not in ARGS.ZIP_FILES:
         #import pdb;pdb.set_trace()
         # Create command
-        args.ZIP_FILES[zipfilepath] = { "files" : files }
+        ARGS.ZIP_FILES[zipfilepath] = { "files" : files }
         env.Command( zipfilepath, "", _zipfile)
     else:
-        files = args.ZIP_FILES[zipfilepath]["files"]
+        files = ARGS.ZIP_FILES[zipfilepath]["files"]
 
     env.Depends( zipfilepath, source )
     files.append( (source, arcpath) )
@@ -315,7 +324,7 @@ def _py2pyc(target,source,env):
     """ Compile python sources to .pyc using selected python compiler """
     # Can strip docstrings and enable optimizations only through command line
     # But no matter since we could be on Py 2.6 but 2.5 is needed
-    cmd = r"""%s -OO -c "import py_compile as p;""" % args.PYTHON_COMPILER
+    cmd = r"""%s -OO -c "import py_compile as p;""" % ARGS.PYTHON_COMPILER
 
     files = zip(source,target )
     for py, pyc in files:
@@ -327,7 +336,7 @@ def _py2pyc(target,source,env):
 def Python2ByteCode( source, target = ".pyc", env = None ):
     """ Utility to compile Python source into a byte code """
 
-    FinalizeSymbianScons()
+    _finalize_symbian_scons()
     if target in [".pyc", ".pyo"]:
         target = source.replace(".py", target)
 
@@ -357,7 +366,7 @@ def ToPackage( env = None,     package_drive_map = None,
     @param package: Package(.sis) to be used. Nothing done, if None.
     @param target: Folder on device
     @param source: Source path of the file
-    @param toemulator: Flag to determine if the file is installed for args.SDK's emulator.
+    @param toemulator: Flag to determine if the file is installed for SDK's emulator.
     @param dopycompile: Compile .py sources into .pyc or .pyo
                         Can be a full path.
                         Set to None to disable byte-code compilation.
@@ -379,7 +388,7 @@ def ToPackage( env = None,     package_drive_map = None,
         if notnone is None:
             raise AttributeError( "Error: '%s' is None." % attr )
 
-    FinalizeSymbianScons()
+    _finalize_symbian_scons()
     if env is None:
         env = DefaultEnvironment()
 
@@ -388,10 +397,10 @@ def ToPackage( env = None,     package_drive_map = None,
         return
 
     # Convert python source into a byte code
-    if dopycompile and args.PYTHON_COMPILER and source.endswith(".py"):
+    if dopycompile and ARGS.PYTHON_COMPILER and source.endswith(".py"):
         source = Python2ByteCode( source, target = dopycompile )
 
-    # WARNING: Copying to any/c/e is custom Ensymble feature of PyS60 args.CE
+    # WARNING: Copying to any/c/e is custom Ensymble feature of PyS60 ARGS.CE
     drive = ""
 
     # Gets reference.
@@ -413,10 +422,10 @@ def ToPackage( env = None,     package_drive_map = None,
                 drive = d
                 break
 
-    pkgsource = join( args.PACKAGE_FOLDER, package, drive, target, basename( source ) )
+    pkgsource = join( ARGS.PACKAGE_FOLDER, package, drive, target, basename( source ) )
     # Handle Python library zipping
     if pylibzip is not None and _is_python_file(source):
-        fullzippath = abspath( join( args.PACKAGE_FOLDER, package, drive, pylibzip ) )
+        fullzippath = abspath( join( ARGS.PACKAGE_FOLDER, package, drive, pylibzip ) )
         zipfolder   = dirname( fullzippath )
         arcpath = abspath( pkgsource )
         arcpath = arcpath.replace( zipfolder, "" )
@@ -431,8 +440,8 @@ def ToPackage( env = None,     package_drive_map = None,
         else:
             pkg[pkgsource] = join( drive, pylibzip )
 
-        if toemulator and args.COMPILER == args.COMPILER_WINSCW:
-            env.Install( join( args.FOLDER_EMULATOR_C, dirname(pylibzip) ), pkgsource )
+        if toemulator and ARGS.COMPILER == ARGS.COMPILER_WINSCW:
+            env.Install( join( ARGS.INSTALL_EMULATOR_C, dirname(pylibzip) ), pkgsource )
 
         return fullzippath
 
@@ -440,17 +449,17 @@ def ToPackage( env = None,     package_drive_map = None,
         # Add to pkg generator
         pkg[pkgsource] = join( drive, target, basename( source ) )
 
-        env.Depends( symbian_pkg.GetPkgFilename( package ), join( args.PACKAGE_FOLDER, package, pkg[pkgsource] ) )
+        env.Depends( symbian_pkg.GetPkgFilename( package ), join( ARGS.PACKAGE_FOLDER, package, pkg[pkgsource] ) )
 
-        package_target = join( args.PACKAGE_FOLDER, package, drive, target )
+        package_target = join( ARGS.PACKAGE_FOLDER, package, drive, target )
         cmd = env.Install( package_target, source )
-        Clean( cmd,join( args.PACKAGE_FOLDER, package) )
+        Clean( cmd,join( ARGS.PACKAGE_FOLDER, package) )
 
         if drive == "":
             pkg[pkgsource] = join( "any", target, basename( source ) )
 
-        if toemulator and args.COMPILER == args.COMPILER_WINSCW:
-            env.Install( join( args.FOLDER_EMULATOR_C, target ), source )
+        if toemulator and ARGS.COMPILER == ARGS.COMPILER_WINSCW:
+            env.Install( join( ARGS.INSTALL_EMULATOR_C, target ), source )
 
     return target
 
@@ -477,14 +486,14 @@ def SymbianProgram( target, targettype = None, #IGNORE:W0621
     """
     Main function for compiling Symbian applications and libraries.
     Handles the whole process of source and resource compiling
-    and args.SIS installer packaging.
+    and SIS installer packaging.
 
     @param target: Name of the module without file extension.
                     If the name ends with .mmp, the .mmp file is used for
                     defining the module.
     @type target: str
 
-    @param targettype: Type of the program. One of args.L{arguments.TARGETTYPES}.
+    @param targettype: Type of the program. One of L{arguments.TARGETTYPES}.
     @type targettype: str
 
     @param sources:     List of paths to sources to compiler
@@ -499,7 +508,7 @@ def SymbianProgram( target, targettype = None, #IGNORE:W0621
     @param sid: Secure id. Defaults to uid3.
     @type sid: str/hex
 
-    @param mmpexport: Path to the generated args.MMP
+    @param mmpexport: Path to the generated MMP
     @type mmpexport: str
 
     @param definput:    Path to .def file containing frozen library entrypoints.
@@ -509,13 +518,13 @@ def SymbianProgram( target, targettype = None, #IGNORE:W0621
     @type icons: list
 
     @param resources:   List of paths to .rss files to compile.
-                        See rssdefines param for giving args.CPP macros.
+                        See rssdefines param for giving CPP macros.
     @type resources: list
 
     @param libraries: Used libraries.
     @type libraries: list
 
-    @param capabilities: Used capabilities. Default: args.FREE_CAPS
+    @param capabilities: Used capabilities. Default: FREE_CAPS
     @type capabilities: list
 
     @param defines: Preprocess definitions.
@@ -534,14 +543,14 @@ def SymbianProgram( target, targettype = None, #IGNORE:W0621
     @param win32_subsystem: str, either "windows" or "console"
 
     @param package:       Path to installer file. If given, an installer is automatically created.
-                          The files are copied to args.L{arguments.PACKAGE_FOLDER} and
+                          The files are copied to L{arguments.PACKAGE_FOLDER} and
                           Ensymble is used to create an installer package with simplesis command.
 
     @type package: str
 
     @param package_drive_map: For custom Ensymble with drive destination support.
                               Map files to drives by using regular expressions.
-                              For example, to map .mif and .rsc files to args.C drive:
+                              For example, to map .mif and .rsc files to C drive:
                                 package_drive_map = { "C" : ".*[.](mif|rsc)" }
                               The files goes to 'any' folder by default.
 
@@ -553,14 +562,14 @@ def SymbianProgram( target, targettype = None, #IGNORE:W0621
     @type extra_depends: list
 
     @param kwargs: Additional keywords passed to selected compiler environment
-                   factory: args.L{gcce.create_environment}, args.L{winscw.create_environment}
+                   factory: L{gcce.create_environment}, L{winscw.create_environment}
 
     @return: Last Command. For setting dependencies.
 
     """
 
     # Transforms arguments into keywords
-    FinalizeSymbianScons()
+    _finalize_symbian_scons()
     kwargs.update( locals() )
 
     handler = SymbianProgramHandler( **kwargs )
@@ -570,7 +579,7 @@ class SymbianProgramHandler(object):
     """Internal class for handling the SymbianProgram function call"""
     def __init__(self, **kwargs):
 
-        FinalizeSymbianScons()
+        _finalize_symbian_scons()
         #: Compiler environment
         self._env = None
         self.target = None
@@ -590,11 +599,11 @@ class SymbianProgramHandler(object):
         """Is the component enabled."""
         component_name = ".".join( [ self.target, self.targettype] ).lower()
 
-        if args.COMPONENTS is not None:
-            inlist = ( component_name in args.COMPONENTS )
-            if inlist and not args.COMPONENTS_EXCLUDE:
+        if ARGS.COMPONENTS is not None:
+            inlist = ( component_name in ARGS.COMPONENTS )
+            if inlist and not ARGS.COMPONENTS_EXCLUDE:
                 pass
-            elif not inlist and args.COMPONENTS_EXCLUDE:
+            elif not inlist and ARGS.COMPONENTS_EXCLUDE:
                 pass
             else:
                 print "Ignored Symbian component %s(%s)" % ( component_name, self.uid3 )
@@ -607,7 +616,7 @@ class SymbianProgramHandler(object):
     def _doConvertIcons( self, env, target, source):
 
         # Creates 32 bit icons
-        convert_icons_cmd = ( args.EPOCROOT + r'epoc32/tools/mifconv "%s" /c32 "%s"' ).replace( "\\", "/" )
+        convert_icons_cmd = ( ARGS.EPOCROOT + r'epoc32/tools/mifconv "%s" /c32 "%s"' ).replace( "\\", "/" )
 
         if os.name == 'nt':
             source_icon = source[0].abspath
@@ -659,9 +668,9 @@ class SymbianProgramHandler(object):
         if self.icons is None:
             return
 
-        sdk_data_resource = args.EPOCROOT + r"epoc32/DATA/Z/resource/apps/%s"
-        sdk_resource = join( args.EPOCROOT + r"epoc32", "release", args.COMPILER,
-                         args.RELEASE, "z", "resource", "apps", "%s" )
+        sdk_data_resource = ARGS.EPOCROOT + r"epoc32/DATA/Z/resource/apps/%s"
+        sdk_resource = join( ARGS.EPOCROOT + r"epoc32", "release", ARGS.COMPILER,
+                         ARGS.RELEASE, "z", "resource", "apps", "%s" )
 
         icon_target_path = join( self.output_folder, "%s_aif.mif" )
         icon_targets = [] # Icons at WINSCW/...
@@ -719,7 +728,7 @@ class SymbianProgramHandler(object):
         env = self._env
         installfolder = [ ]
 
-        if self.targettype != args.TARGETTYPE_LIB:
+        if self.targettype != ARGS.TARGETTYPE_LIB:
             installfolder += ["sys", "bin" ]
         else: # Don't install libs to device.
             installfolder += ["lib"]
@@ -730,22 +739,22 @@ class SymbianProgramHandler(object):
         #installpath = join( installfolder, "%s.%s" % ( self.target, self.targettype ) )
 
         # Combine with installfolder copying.
-        #TODO: Not needed anymore since args.INSTALL_EPOCROOT is default target.
+        #TODO: Not needed anymore since ARGS.INSTALL_EPOCROOT is default target.
         postcommands = []
         copysource = self._result_template % ( "." + self.targettype )
         target_filename = self.target + "." + self.targettype
-        sdkpath = join( args.SDKFOLDER, target_filename )
+        sdkpath = join( ARGS.SDKFOLDER, target_filename )
 
         installed = []
-        if args.COMPILER == args.COMPILER_WINSCW:
+        if ARGS.COMPILER == ARGS.COMPILER_WINSCW:
             # Copy to SDK to be used with simulator
             postcommands.append( Copy( sdkpath, copysource ) )
             installed.append( sdkpath )
 
         if self.output_libpath is not None:
-            if (  args.COMPILER == args.COMPILER_WINSCW and
-                  self.targettype != args.TARGETTYPE_LIB) or \
-                args.COMPILER == args.COMPILER_GCCE and self.targettype == args.TARGETTYPE_LIB :
+            if (  ARGS.COMPILER == ARGS.COMPILER_WINSCW and
+                  self.targettype != ARGS.TARGETTYPE_LIB) or \
+                ARGS.COMPILER == ARGS.COMPILER_GCCE and self.targettype == ARGS.TARGETTYPE_LIB :
 
                 s, t = self.output_libpath
                 postcommands.append( Copy( t, s ) )
@@ -756,7 +765,7 @@ class SymbianProgramHandler(object):
                          copysource,
                          postcommands )
 
-        if self.targettype != args.TARGETTYPE_LIB:
+        if self.targettype != ARGS.TARGETTYPE_LIB:
             ToPackage( env, self.package_drive_map, self.package,
                     installfolder,
                     copysource, toemulator = False )
@@ -807,7 +816,7 @@ class SymbianProgramHandler(object):
                              rss_path,
                              "-m045,046,047",
                              self.sysincludes + self.includes,
-                             [args.PLATFORM_HEADER],
+                             [ARGS.PLATFORM_HEADER],
                              self.rssdefines )
 
                 self._env.Depends( res_compile_command, self.converted_icons )
@@ -824,7 +833,7 @@ class SymbianProgramHandler(object):
                 ToPackage( self._env, self.package_drive_map, self.package,
                            installfolder, converted_rsc, toemulator = False )
 
-                includefolder = args.INSTALL_EPOC32_INCLUDE
+                includefolder = ARGS.INSTALL_EPOC32_INCLUDE
 
                 # Copy to /epoc32/include/
                 self._env.Install( includefolder, converted_rsg )#IGNORE:E1101
@@ -834,18 +843,18 @@ class SymbianProgramHandler(object):
                 self.resource_headers.append( includepath )
 
                 # _reg files copied to /epoc32/DATA/Z/private/10003a3f/apps/ on simulator
-                if args.COMPILER == args.COMPILER_WINSCW:
+                if ARGS.COMPILER == ARGS.COMPILER_WINSCW:
                     if "_reg" in rss_path.lower():
-                        self._env.Install( join( args.INSTALL_EPOC32_DATA, "Z", "private","10003a3f","apps"), converted_rsc )
-                        self._env.Install( join( args.INSTALL_EPOC32_RELEASE, "Z", "private","10003a3f","apps"), converted_rsc )
-                        self._env.Install( join( args.INSTALL_EPOC32_DATA, "Z",
+                        self._env.Install( join( ARGS.INSTALL_EPOC32_DATA, "Z", "private","10003a3f","apps"), converted_rsc )
+                        self._env.Install( join( ARGS.INSTALL_EPOC32_RELEASE, "Z", "private","10003a3f","apps"), converted_rsc )
+                        self._env.Install( join( ARGS.INSTALL_EPOC32_DATA, "Z",
                                                 "private","10003a3f","import", "apps"), converted_rsc )
-                        self._env.Install( join( args.INSTALL_EPOC32_RELEASE,
+                        self._env.Install( join( ARGS.INSTALL_EPOC32_RELEASE,
                                                 "Z", "private","10003a3f", "import", "apps"), converted_rsc )
 
                     else: # Copy normal resources to resource/apps folder
-                        self._env.Install( join( args.INSTALL_EPOC32_DATA, "Z", "resource","apps"), converted_rsc )
-                        self._env.Install( join( args.INSTALL_EPOC32_RELEASE, "Z", "resource", "apps"), converted_rsc )
+                        self._env.Install( join( ARGS.INSTALL_EPOC32_DATA, "Z", "resource","apps"), converted_rsc )
+                        self._env.Install( join( ARGS.INSTALL_EPOC32_RELEASE, "Z", "resource", "apps"), converted_rsc )
 
                 # Depend on previous. TODO: Use SCons Preprocessor scanner.
                 if prev_resource is not None:
@@ -854,16 +863,16 @@ class SymbianProgramHandler(object):
 
     def _handleGCCEBuild(self):
         env = self._env
-        output_lib   = ( self.targettype in args.DLL_TARGETTYPES )
+        output_lib   = ( self.targettype in ARGS.DLL_TARGETTYPES )
         elf_dll_path = self._result_template % ( "._elf_" + self.targettype )
         resultables  = [ elf_dll_path  ]
 
         if output_lib:
             libname = self.target + ".dso"
-            self.output_libpath = ( args.INSTALL_EPOCROOT + r"epoc32/release/%s/%s/%s" % ( "armv5", "lib", libname ) )
+            self.output_libpath = ( ARGS.INSTALL_EPOCROOT + r"epoc32/release/%s/%s/%s" % ( "armv5", "lib", libname ) )
 
         build_prog = None
-        if self.targettype != args.TARGETTYPE_LIB:
+        if self.targettype != ARGS.TARGETTYPE_LIB:
             build_prog = self._env.Program( resultables, self.sources )#IGNORE:E1101
 
             # Depend on the libs
@@ -878,12 +887,12 @@ class SymbianProgramHandler(object):
             # Create final binary and lib/dso
             env.Elf( resultables, elf_dll_path )#IGNORE:E1101
 
-            env.Install( args.INSTALL_EPOCROOT + r"epoc32/release/gcce/%s" % ( args.RELEASE ),
+            env.Install( ARGS.INSTALL_EPOCROOT + r"epoc32/release/gcce/%s" % ( ARGS.RELEASE ),
                          ".".join( [resultables[0], self.targettype] ) )
         else:
             build_prog = env.StaticLibrary( self._result_template % ".lib" , self.sources )#IGNORE:E1101
             self.output_libpath = ( self._result_template % ".lib",
-                                    args.INSTALL_EPOCROOT + r"epoc32/release/armv5/%s/%s.lib" % ( args.RELEASE, self.target ) )
+                                    ARGS.INSTALL_EPOCROOT + r"epoc32/release/armv5/%s/%s.lib" % ( ARGS.RELEASE, self.target ) )
 
         return build_prog
 
@@ -892,7 +901,7 @@ class SymbianProgramHandler(object):
         """Create .UID.CPP for simulator"""
         template = ""
         capabilities = winscw.make_capability_hex( self.capabilities )
-        if self.targettype == args.TARGETTYPE_EXE:
+        if self.targettype == ARGS.TARGETTYPE_EXE:
             template = winscw.TARGET_UID_CPP_TEMPLATE_EXE % { "UID3": self.uid3,
                                                               "SID" : self.sid,
                                                               "CAPABILITIES": capabilities }
@@ -907,13 +916,13 @@ class SymbianProgramHandler(object):
         """
         DLL:
         A temporary library(.lib) is created in order to generate .inf file, which in turn
-        is used to generate exports .def file with makedef.pl perl script. 
+        is used to generate exports .def file with makedef.pl perl script.
         The .def file is used to generate the final dll.
         """
         # Compile sources ------------------------------------------------------
         env = self._env
 
-        if self.targettype != args.TARGETTYPE_LIB:
+        if self.targettype != ARGS.TARGETTYPE_LIB:
             # Create <target>.UID.CPP from template---------------------------------
             uid_cpp_filename = self._result_template % ".UID.cpp"
             #self._createUIDCPP( [env.File( uid_cpp_filename)], None, env )
@@ -926,7 +935,6 @@ class SymbianProgramHandler(object):
             env.CreateUID( uid_cpp_filename, self.sources )#IGNORE:E1101
 
             # uid.cpp depends on the value of the capabilities
-            #import SCons.Node.Python
             caps_value = env.Value(self.capabilities)
             env.Depends( uid_cpp_filename, caps_value )
 
@@ -934,7 +942,7 @@ class SymbianProgramHandler(object):
             self.sources.append( uid_cpp_filename )
 
         # Compile the sources. Create object files( .o ) and temporary dll.
-        output_lib = ( self.targettype in args.DLL_TARGETTYPES )
+        output_lib = ( self.targettype in ARGS.DLL_TARGETTYPES )
         temp_dll_path = self._result_template % ( "._tmp_" + self.targettype )
         resultables = [ temp_dll_path ]
 
@@ -945,29 +953,29 @@ class SymbianProgramHandler(object):
             resultables.append( resultable_path )
             #resultables.append( self._result_template % ".inf" )
             self.output_libpath = ( self._result_template % ".lib",
-                                join( args.INSTALL_EPOC32_RELEASE, libname ) )
-        if self.targettype == args.TARGETTYPE_EXE:
+                                join( ARGS.INSTALL_EPOC32_RELEASE, libname ) )
+        if self.targettype == ARGS.TARGETTYPE_EXE:
             build_prog = env.Program( self._result_template % ".exe", self.sources )
-            env.Depends( build_prog, [ join( args.EPOC32_RELEASE, libname ) for libname in self.libraries] )
-            env.Depends( build_prog, [ join( args.INSTALL_EPOC32_RELEASE,
+            env.Depends( build_prog, [ join( ARGS.EPOC32_RELEASE, libname ) for libname in self.libraries] )
+            env.Depends( build_prog, [ join( ARGS.INSTALL_EPOC32_RELEASE,
                                             libname ) for libname in self.user_libraries] )
             return
 
-        elif self.targettype != args.TARGETTYPE_LIB:
+        elif self.targettype != ARGS.TARGETTYPE_LIB:
             build_prog = env.Program( resultables, self.sources )#IGNORE:E1101
             # Depends on the used libraries. This has a nice effect since if,
             # this project depends on one of the other projects/components/dlls/libs
             # the depended project is automatically built first.
-            env.Depends( build_prog, [ join( args.EPOC32_RELEASE, libname ) for libname in self.libraries] )
-            env.Depends( build_prog, [ join( args.INSTALL_EPOC32_RELEASE,
+            env.Depends( build_prog, [ join( ARGS.EPOC32_RELEASE, libname ) for libname in self.libraries] )
+            env.Depends( build_prog, [ join( ARGS.INSTALL_EPOC32_RELEASE,
                                             libname ) for libname in self.user_libraries] )
 
         else:
             build_prog = env.StaticLibrary( self._result_template % ".lib" , self.sources )#IGNORE:E1101
             self.output_libpath = ( self._result_template % ".lib",
-                                join( args.INSTALL_EPOC32_RELEASE, "%s.lib" % ( self.target ) ) )
+                                join( ARGS.INSTALL_EPOC32_RELEASE, "%s.lib" % ( self.target ) ) )
 
-        if output_lib and self.targettype != args.TARGETTYPE_LIB:
+        if output_lib and self.targettype != ARGS.TARGETTYPE_LIB:
             # Create .inf file from the .lib
             definput = self.definput
             if definput is not None:# and os.path.exists(definput):
@@ -1009,11 +1017,11 @@ class SymbianProgramHandler(object):
 
         libfolder = "%EPOCROOT%epoc32/release/winscw/udeb/"
         libs = [ libfolder + x for x in self.libraries] + [
-            join(args.INSTALL_EPOC32_RELEASE, x) for x in self.user_libraries ]
+            join(ARGS.INSTALL_EPOC32_RELEASE, x) for x in self.user_libraries ]
         win32_libs = self.win32_libraries or []
         win32_subsystem = self.win32_subsystem or "windows"
 
-        if self.targettype in args.DLL_TARGETTYPES and self.targettype != args.TARGETTYPE_LIB:
+        if self.targettype in ARGS.DLL_TARGETTYPES and self.targettype != ARGS.TARGETTYPE_LIB:
 
             env.Command( self._result_template % ( "." + self.targettype ), [ temp_dll_path, self._result_template % ".def" ],
             [
@@ -1041,8 +1049,8 @@ class SymbianProgramHandler(object):
             return
 
         helpresult = SymbianHelp( self.help, self.uid3, env = self._env )
-        #if args.COMPILER == args.COMPILER_WINSCW:
-            #self._env.Install( join( args.FOLDER_EMULATOR_C, "resource", "help" ), helpresult[0] )#IGNORE:E1101
+        #if ARGS.COMPILER == ARGS.COMPILER_WINSCW:
+            #self._env.Install( join( ARGS.INSTALL_EMULATOR_C, "resource", "help" ), helpresult[0] )#IGNORE:E1101
 
         ToPackage( self._env, self.package_drive_map, self.package,
                     join( "resource", "help" ),
@@ -1082,13 +1090,13 @@ class SymbianProgramHandler(object):
     def Process(self):
 
         # Skip processing to speed up help message
-        if args.HELP_ENABLED: return
+        if ARGS.HELP_ENABLED: return
 
         if self.target.lower().endswith( ".mmp" ):
             self._importMMP()
 
         # After mmp import
-        self.output_folder = get_output_folder( args.COMPILER, args.RELEASE, self.target, self.targettype )
+        self.output_folder = get_output_folder( ARGS.COMPILER, ARGS.RELEASE, self.target, self.targettype )
 
         if self.includes is None:
             self.includes = []
@@ -1104,7 +1112,7 @@ class SymbianProgramHandler(object):
         if self.sysincludes is None:
             self.sysincludes = []
 
-        self.sysincludes.extend( args.SYSTEM_INCLUDES )
+        self.sysincludes.extend( ARGS.SYSTEM_INCLUDES )
 
         if self.help:
         # Adds the .hrh file to include path
@@ -1119,15 +1127,15 @@ class SymbianProgramHandler(object):
         self.user_libraries = self.user_libraries[:]
         self.origlibraries  = self.libraries[:]
 
-        if args.CMD_LINE_LIBS is not None:
-            self.libraries.extend( args.CMD_LINE_LIBS )
+        if ARGS.CMD_LINE_LIBS is not None:
+            self.libraries.extend( ARGS.CMD_LINE_LIBS )
 
         if self.capabilities is None:
-            self.capabilities = args.CAPS_SELF_SIGNED
+            self.capabilities = ARGS.CAPS_SELF_SIGNED
 
         # Handle UIDs
         if self.uid2 is None:
-            if self.targettype == args.TARGETTYPE_EXE:
+            if self.targettype == ARGS.TARGETTYPE_EXE:
                 self.uid2 = "0x100039ce"
             else:
                 self.uid2 = "0x0"
@@ -1186,11 +1194,11 @@ class SymbianProgramHandler(object):
         self.sources = tmp
 
         # This is often needed
-        args.FOLDER_TARGET_TUPLE = ( self.output_folder, self.target )
+        ARGS.FOLDER_TARGET_TUPLE = ( self.output_folder, self.target )
         Mkdir( self.output_folder )
 
         # Target resultable template. Just give extension of the file
-        self._result_template = "%s/%s" % args.FOLDER_TARGET_TUPLE + "%s"
+        self._result_template = "%s/%s" % ARGS.FOLDER_TARGET_TUPLE + "%s"
         self._result_template = os.path.abspath( self._result_template )
 
         # Copy the modified keywords from self ignoring private
@@ -1205,7 +1213,7 @@ class SymbianProgramHandler(object):
 
         # File duplication can be disabled with SCons's -n parameter to ease use of IDE(Carbide)
         # It seems that SCons is not always able to detect changes if duplication is disabled.
-        self._env.VariantDir( self.output_folder, ".", duplicate = args.DO_DUPLICATE_SOURCES )
+        self._env.VariantDir( self.output_folder, ".", duplicate = ARGS.DO_DUPLICATE_SOURCES )
 
         # Define build dir for top folders.
         updirs = list(set(updirs))
@@ -1215,7 +1223,7 @@ class SymbianProgramHandler(object):
             out_updir = "/" + "/".join( ["_up_"] * count )
             src_updir = "/".join( [".."] * count )
             #print self.output_folder + out_updir, src_updir
-            self._env.VariantDir( self.output_folder + out_updir, src_updir, duplicate = args.DO_DUPLICATE_SOURCES )
+            self._env.VariantDir( self.output_folder + out_updir, src_updir, duplicate = ARGS.DO_DUPLICATE_SOURCES )
 
 
         #------------------------------------------------------- Generate help files
@@ -1232,7 +1240,7 @@ class SymbianProgramHandler(object):
 
         build_prog = None
         #---------------------------------------------------------- Build using GCCE
-        if args.COMPILER == args.COMPILER_GCCE:
+        if ARGS.COMPILER == ARGS.COMPILER_GCCE:
             build_prog = self._handleGCCEBuild()
         #-------------------------------------------------------- Build using WINSCW
         else:
@@ -1251,7 +1259,7 @@ class SymbianProgramHandler(object):
         installed = self._copyResultBinary()
 
         #---------------------------------------------------------------- Export MMP
-        if self.mmpexport is not None and args.MMP_EXPORT_ENABLED:
+        if self.mmpexport is not None and ARGS.MMP_EXPORT_ENABLED:
             exporter = mmp_parser.MMPExporter( self.mmpexport )
             data = exporter.MMPData
 
@@ -1259,8 +1267,8 @@ class SymbianProgramHandler(object):
             #import pdb;pdb.set_trace()
             data.TARGETTYPE = self.targettype
             #import pdb;pdb.set_trace()
-            defines = self.defines[:] + args.EXTRA_DEFINES
-            #for d in args.STANDARD_DEFINES:
+            defines = self.defines[:] + ARGS.EXTRA_DEFINES
+            #for d in ARGS.STANDARD_DEFINES:
             #    if d in defines:
             #        defines.remove(d)
             if hasattr( self, "epocstacksize" ):
@@ -1283,9 +1291,9 @@ class SymbianProgramHandler(object):
             exporter.Export()
             exporter.Save()
 
-            print( "Info: args.MMP exported '%s'" % self.mmpexport )
+            print( "Info: ARGS.MMP exported '%s'" % self.mmpexport )
 
-        if self.package is not None and self.package != "" and self.targettype != args.TARGETTYPE_LIB:
+        if self.package is not None and self.package != "" and self.targettype != ARGS.TARGETTYPE_LIB:
             # package depends on the files anyway
             self._env.Depends( self.package, installed )
 

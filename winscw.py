@@ -5,7 +5,7 @@ __license__ = "MIT License"
 
 from SCons.Environment import Environment
 from arguments import * #IGNORE:W0611
-import arguments as args
+import arguments as ARGS
 import textwrap
 
 DEFAULT_WINSCW_DEFINES = DEFAULT_SYMBIAN_DEFINES[:]
@@ -116,7 +116,7 @@ def create_environment( target,
                         winscw_options = None,
                         win32_libraries = None,
                         win32_subsystem = None,
-                        *env_args,
+                        *args,
                         **kwargs
                         ):
     """Create WINSCW environment
@@ -137,7 +137,7 @@ def create_environment( target,
     OUTPUT_FOLDER = get_output_folder( COMPILER, RELEASE, target, targettype )
 
     LIBPATH = SYMBIAN_WINSCW_LIBPATHLIB
-    USER_LIBPATH = args.INSTALL_EPOC32_RELEASE
+    USER_LIBPATH = ARGS.INSTALL_EPOC32_RELEASE
     LIBRARIES = [ os.path.normpath( LIBPATH + x ).lower() for x in libraries ] + [ os.path.normpath( os.path.join(USER_LIBPATH, x) ).lower() for x in user_libraries ] + win32_libraries
     defines.extend( DEFAULT_WINSCW_DEFINES )
     defines.extend( CMD_LINE_DEFINES )

@@ -81,7 +81,7 @@ INSTALL_EPOC32_DATA = None
 INSTALL_EPOC32_INCLUDE = None
 INSTALL_EPOC32_TOOLS = None
 INSTALL_EPOC32_RELEASE = None
-FOLDER_EMULATOR_C = None
+INSTALL_EMULATOR_C = None
 SDKFOLDER = None
 SYSTEM_INCLUDES = None
 
@@ -97,7 +97,7 @@ def ResolveInstallDirectories():
 
   global INSTALL_EPOCROOT, INSTALL_EPOC32, INSTALL_EPOC32_DATA
   global INSTALL_EPOC32_INCLUDE, INSTALL_EPOC32_TOOLS, INSTALL_EPOC32_RELEASE
-  global FOLDER_EMULATOR_C, SDKFOLDER, SYSTEM_INCLUDES
+  global INSTALL_EMULATOR_C, SDKFOLDER, SYSTEM_INCLUDES
   if not INSTALL_EPOCROOT is None:
     return False
   #: Final output directories, mimicking SDK structure
@@ -117,7 +117,7 @@ def ResolveInstallDirectories():
   #: Constant pointing to release folder
   INSTALL_EPOC32_RELEASE = join( INSTALL_EPOC32, "release", COMPILER, RELEASE )
   #: Constant pointing to emulator c drive
-  FOLDER_EMULATOR_C = join( EPOC32, "winscw", "c" )
+  INSTALL_EMULATOR_C = join( EPOC32, "winscw", "c" )
   #: Default include folders
   SYSTEM_INCLUDES = [ EPOC32_INCLUDE,
                       join( EPOC32_INCLUDE, "variant" ),
@@ -157,9 +157,6 @@ COMPILER = GetArg( "compiler", "The compiler to use.", COMPILER, COMPILERS )
 
 #: Release type
 RELEASE = GetArg( "release", "Release type.", RELEASE, RELEASETYPES )
-
-#: Location for the packages. Value generated in run-time.
-PACKAGE_FOLDER = abspath( join( "%s_%s" % ( COMPILER, RELEASE ), "packages" ) )
 
 #: Compiler flags for GCCE
 GCCE_OPTIMIZATION_FLAGS = GetArg( "gcce_options", "GCCE compiler options.",
@@ -267,6 +264,9 @@ def _resolve_platform():
 
 _resolve_platform()
 
+#: Location for the packages. Value generated in run-time.
+PACKAGE_FOLDER = abspath( join( "build%d_%d" % SYMBIAN_VERSION, "%s_%s" % ( COMPILER, RELEASE ), "packages" ) )
+
 sysout( "Info: Symbian OS version = %d.%d" % SYMBIAN_VERSION )
 sysout( "Info: UI platform        = %s" % UI_PLATFORM, "%d.%d" % UI_VERSION )
 
@@ -360,7 +360,7 @@ else:
     DEFAULT_SYMBIAN_DEFINES.append( "_DEBUG" )
 
 def get_output_folder( compiler, release, target, targettype ):
-    p = os.path.join( "s_v" + "%d_%d" % SYMBIAN_VERSION, compiler + "_" + release, target + "_" + targettype )
+    p = os.path.join( "build" + "%d_%d" % SYMBIAN_VERSION, compiler + "_" + release, target + "_" + targettype )
     return os.path.abspath( p )
 
 # Generate help message
