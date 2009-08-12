@@ -1008,7 +1008,7 @@ class SymbianProgramHandler(object):
                 " ".join( [
                             'mwldsym2 -msgstyle gcc',
                             '-stdlib %EPOCROOT%epoc32/release/winscw/udeb/edll.lib -noentry',
-                            '-shared -subsystem ' % win32_subsystem,
+                            '-shared -subsystem %s' % win32_subsystem,
                             '-g %s' % " ".join( libs ),
                             ' %s' % " ".join( win32_libs ),
                             '-o "%s"' % temp_dll_path,
