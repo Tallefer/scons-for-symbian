@@ -128,8 +128,6 @@ def create_environment( target,
     win32_subsystem = win32_subsystem or "windows"
     win32_libraries = win32_libraries or []
 
-    libraries += win32_libraries
-
     defines = kwargs["defines"][:]
     for x in xrange( len( libraries ) ):
         lib = libraries[x]
@@ -140,7 +138,7 @@ def create_environment( target,
 
     LIBPATH = SYMBIAN_WINSCW_LIBPATHLIB
     USER_LIBPATH = args.INSTALL_EPOC32_RELEASE
-    LIBRARIES = [ os.path.normpath( LIBPATH + x ).lower() for x in libraries ] + [ os.path.normpath( os.path.join(USER_LIBPATH, x) ).lower() for x in user_libraries ]
+    LIBRARIES = [ os.path.normpath( LIBPATH + x ).lower() for x in libraries ] + [ os.path.normpath( os.path.join(USER_LIBPATH, x) ).lower() for x in user_libraries ] + win32_libraries
     defines.extend( DEFAULT_WINSCW_DEFINES )
     defines.extend( CMD_LINE_DEFINES )
 
@@ -157,19 +155,25 @@ def create_environment( target,
 
      #%(EPOCROOT)sepoc32/RELEASE/WINSCW/UDEB/euser.lib %(EPOCROOT)sepoc32/release/WINSCW/UDEB/efsrv.lib
     LINKFLAGS = ""
+    search_flag = ""
+    if win32_libraries:
+      # win32 libraries live in the linker's standard library folder, we don't
+      # want to look for them, let the linker do that.
+      search_flag = "-search"
     if targettype in DLL_TARGETTYPES:
         LINKFLAGS = " ".join( [
                     '-msgstyle gcc',
                     '-stdlib "%s"' % join( EPOC32_RELEASE, 'edll.lib'),
                     '-noentry -shared',
-                    '-subsystem windows',
+                    '-subsystem %s' % win32_subsystem,
                     '-g',
                     '-export dllexport',
                     '-m __E32Dll',
                     '-nocompactimportlib',
                     '-implib %(OUTPUT_FOLDER)s/%(TARGET)s._tmp_lib',
                     '-addcommand "out:%(TARGET)s._tmp_%(TARGETTYPE)s"',
-                    '-warnings off'
+                    '-warnings off',
+                    search_flag,
                     ])
 
     elif targettype == TARGETTYPE_EXE:
@@ -179,6 +183,7 @@ def create_environment( target,
                     '-m "?_E32Bootstrap@@YGXXZ"',
                     '-subsystem %s' % win32_subsystem,
                     '-noimplib',
+                    search_flag,
                     ])
 
         if epocstacksize is None:

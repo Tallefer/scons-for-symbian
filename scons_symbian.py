@@ -946,14 +946,14 @@ class SymbianProgramHandler(object):
             #resultables.append( self._result_template % ".inf" )
             self.output_libpath = ( self._result_template % ".lib",
                                 join( args.INSTALL_EPOC32_RELEASE, libname ) )
-        if self.targettype == TARGETTYPE_EXE:
+        if self.targettype == args.TARGETTYPE_EXE:
             build_prog = env.Program( self._result_template % ".exe", self.sources )
-            env.Depends( build_prog, [ join( EPOC32_RELEASE, libname ) for libname in self.libraries] )
+            env.Depends( build_prog, [ join( args.EPOC32_RELEASE, libname ) for libname in self.libraries] )
             env.Depends( build_prog, [ join( args.INSTALL_EPOC32_RELEASE,
                                             libname ) for libname in self.user_libraries] )
             return
 
-        elif self.targettype != TARGETTYPE_LIB:
+        elif self.targettype != args.TARGETTYPE_LIB:
             build_prog = env.Program( resultables, self.sources )#IGNORE:E1101
             # Depends on the used libraries. This has a nice effect since if,
             # this project depends on one of the other projects/components/dlls/libs
