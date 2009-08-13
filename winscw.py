@@ -5,6 +5,7 @@ __license__ = "MIT License"
 
 from SCons.Environment import Environment
 from arguments import * #IGNORE:W0611
+import arguments as ARGS
 import textwrap
 
 DEFAULT_WINSCW_DEFINES = DEFAULT_SYMBIAN_DEFINES[:]
@@ -54,8 +55,7 @@ CAPABILITY_MAP = {
         "WRITEUSERDATA" :         (1<<16),
         "LOCATION" :                 (1<<17),
         "SURROUNDINGSDD" :         (1<<18),
-        "USERENVIRONMENT" :         (1<<19),                  
-                  
+        "USERENVIRONMENT" :         (1<<19),
 }
 
 def make_capability_hex(capabilities):
@@ -68,20 +68,20 @@ def make_capability_hex(capabilities):
 _WINSCW_ENV = None
 
 def make_default_environment():
-    global _WINSCW_ENV 
+    global _WINSCW_ENV
     if _WINSCW_ENV is not None:
         return _WINSCW_ENV.Clone()
-    
+
     platform_header = PLATFORM_HEADER#os.path.basename( PLATFORM_HEADER )
     #import pdb;pdb.set_trace()
     sysincludes = " "
     cc_flags = '-g -O0 -inline off -wchar_t off -align 4 -warnings on -w nohidevirtual,nounusedexpr -msgstyle gcc -enum int -str pool -exc ms -trigraphs on  -nostdinc'
-    _WINSCW_ENV = Environment( 
+    _WINSCW_ENV = Environment(
                     tools = ["mingw"], # Disable searching of tools
-                    
+
                     CC = r'mwccsym2',
                     CXX = r'mwccsym2',
-                    
+
                     ENV = os.environ, #os.environ['PATH'],
                     # Static library settings
                     AR = r'mwldsym2',
@@ -94,7 +94,7 @@ def make_default_environment():
                     CCFLAGS = cc_flags + ' -cwd source -I- %s -include "%s"' % ( sysincludes, platform_header ),
                     INCPREFIX = "-i ",
                     CPPDEFPREFIX = "-d ",
-                    
+
                     # Linker settings
                     LINK = r'mwldsym2',
                     LINKFLAGS = "",
@@ -104,42 +104,41 @@ def make_default_environment():
         )
 
     return _WINSCW_ENV
-                            
+
 def create_environment( target,
                         targettype,
                         includes,
                         sysincludes,
                         libraries,
+                        user_libraries,
                         epocheapsize = None,
                         epocstacksize = None,
                         winscw_options = None,
                         win32_libraries = None,
                         win32_subsystem = None,
                         *args,
-                        **kwargs  
+                        **kwargs
                         ):
     """Create WINSCW environment
     @param kwargs: ignored keyword arguments.
     @see: L{scons_symbian.SymbianProgram}
     """
-    
+
     winscw_options = winscw_options   or WINSCW_OPTIMIZATION_FLAGS
     win32_subsystem = win32_subsystem or "windows"
     win32_libraries = win32_libraries or []
-    
-    libraries += win32_libraries
-    
+
     defines = kwargs["defines"][:]
     for x in xrange( len( libraries ) ):
         lib = libraries[x]
         if "." not in lib:
             libraries[x] = lib + ".lib"
-            
+
     OUTPUT_FOLDER = get_output_folder( COMPILER, RELEASE, target, targettype )
 
     LIBPATH = SYMBIAN_WINSCW_LIBPATHLIB
-    LIBRARIES = [ os.path.normpath( LIBPATH + x ).lower() for x in libraries ]    
-    
+    USER_LIBPATH = ARGS.INSTALL_EPOC32_RELEASE
+    LIBRARIES = [ os.path.normpath( LIBPATH + x ).lower() for x in libraries ] + [ os.path.normpath( os.path.join(USER_LIBPATH, x) ).lower() for x in user_libraries ] + win32_libraries
     defines.extend( DEFAULT_WINSCW_DEFINES )
     defines.extend( CMD_LINE_DEFINES )
 
@@ -153,22 +152,28 @@ def create_environment( target,
 
     cc_flags = '-g -O0 -inline off -wchar_t off -align 4 -warnings on -w nohidevirtual,nounusedexpr -msgstyle gcc -enum int -str pool -exc ms -trigraphs on  -nostdinc'
     cc_flags = " ".join( [cc_flags, winscw_options ] )
-    
+
      #%(EPOCROOT)sepoc32/RELEASE/WINSCW/UDEB/euser.lib %(EPOCROOT)sepoc32/release/WINSCW/UDEB/efsrv.lib
     LINKFLAGS = ""
+    search_flag = ""
+    if win32_libraries:
+      # win32 libraries live in the linker's standard library folder, we don't
+      # want to look for them, let the linker do that.
+      search_flag = "-search"
     if targettype in DLL_TARGETTYPES:
         LINKFLAGS = " ".join( [
                     '-msgstyle gcc',
                     '-stdlib "%s"' % join( EPOC32_RELEASE, 'edll.lib'),
                     '-noentry -shared',
-                    '-subsystem windows',
+                    '-subsystem %s' % win32_subsystem,
                     '-g',
                     '-export dllexport',
                     '-m __E32Dll',
                     '-nocompactimportlib',
                     '-implib %(OUTPUT_FOLDER)s/%(TARGET)s._tmp_lib',
                     '-addcommand "out:%(TARGET)s._tmp_%(TARGETTYPE)s"',
-                    '-warnings off'
+                    '-warnings off',
+                    search_flag,
                     ])
 
     elif targettype == TARGETTYPE_EXE:
@@ -177,30 +182,29 @@ def create_environment( target,
                     '-stdlib ' + join( EPOC32_RELEASE, 'eexe.lib'),
                     '-m "?_E32Bootstrap@@YGXXZ"',
                     '-subsystem %s' % win32_subsystem,
+                    '-g',
                     '-noimplib',
+                    search_flag,
                     ])
-        
-        if epocstacksize is None:
-            # This is default for device builds so we'll use it here as well
-            epocstacksize = 80
-        else:
-            # Defined in bytes for device but in kilobytes for winscw
-            epocstacksize /= 1024
-        
-        LINKFLAGS += """
-            -stackreserve %d
-        """ % epocstacksize
-        
+
+        # We don't want to set a stack size on winscw:
+        #   - if the exe is run by starting it in the emulator (epoc.exe) the
+        #     stack size is ignored
+        #   - if the exe is started directly (e.g., from the command line) the
+        #     stack is _not_ ignored, BUT winscw requires a much larger stack
+        #     to work correctly (without KERN-EXEC 3s) than device so we don't
+        #     want to use the device stack limit.
+
         if epocheapsize is not None:
             # TODO: Defined in both gcce.py and winscw.py. Relocate check to upper level
             assert type( epocheapsize ) == tuple, "epocheapsize must be 2-tuple( minsize, maxsize )"
             assert epocheapsize[0] >= 0x1000, "minimum heapsize must be at least 0x1000(4kb)"
-    
+
             # Its defined as kilobytes here
             LINKFLAGS += """
                     -heapreserve=%d -heapcommit=%d
             """ % ( epocheapsize[0] / 1024, epocheapsize[1] / 1024 )
-    
+
     LINKFLAGS = textwrap.dedent( LINKFLAGS )
     LINKFLAGS = " ".join( [ x.strip() for x in LINKFLAGS.split( "\n" ) ] )
 
@@ -208,7 +212,7 @@ def create_environment( target,
                              "TARGETTYPE" : targettype,
                              "EPOCROOT"   : EPOCROOT,
                              "COMPILER"   : COMPILER,
-                             "OUTPUT_FOLDER": OUTPUT_FOLDER 
+                             "OUTPUT_FOLDER": OUTPUT_FOLDER
                              }
 
     platform_header = os.path.basename( PLATFORM_HEADER )
@@ -216,17 +220,17 @@ def create_environment( target,
         sysincludes = "-I" + " -I".join( sysincludes )
     else:
         sysincludes = " "
-    
+
     global _WINSCW_ENV
     env = None
     if _WINSCW_ENV is None:
         #print "env"
-        _WINSCW_ENV = Environment( 
+        _WINSCW_ENV = Environment(
                     tools = ["mingw"], # Disable searching of tools
-                    
+
                     CC = r'mwccsym2',
                     CXX = r'mwccsym2',
-                    
+
                     ENV = os.environ, #os.environ['PATH'],
                     # Static library settings
                     AR = r'mwldsym2',
@@ -239,7 +243,7 @@ def create_environment( target,
                     CCFLAGS = cc_flags + ' -cwd source -I- %s -include "%s"' % ( sysincludes, platform_header ),
                     INCPREFIX = "-i ",
                     CPPDEFPREFIX = "-d ",
-                    
+
                     # Linker settings
                     LINK = r'mwldsym2',
                     LINKFLAGS = LINKFLAGS,
@@ -248,23 +252,23 @@ def create_environment( target,
                     PROGSUFFIX = "." + targettype,
 
         )
-        
+
         env = _WINSCW_ENV
     else:
         # A lot faster than creating the environment from scratch
         env = _WINSCW_ENV.Clone()
-                    
+
     env.Replace( ENV = os.environ,
-                 
-                 # Static library settings                                        
+
+                 # Static library settings
                  CPPPATH = includes,
                  CPPDEFINES = defines,
-                 CCFLAGS = cc_flags + ' -cwd source -I- %s -include "%s"' % ( sysincludes, platform_header ),                    
-                    
-                 # Linker settings                    
+                 CCFLAGS = cc_flags + ' -cwd source -I- %s -include "%s"' % ( sysincludes, platform_header ),
+
+                 # Linker settings
                  LINKFLAGS = LINKFLAGS,
-                 LIBS = LIBRARIES,                    
+                 LIBS = LIBRARIES,
                  PROGSUFFIX = "." + targettype,
     )
-    
+
     return env
