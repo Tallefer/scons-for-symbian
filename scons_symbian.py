@@ -310,7 +310,8 @@ def _zipfile(target,source,env):
 ZIP_FILES = {}
 def File2Zip(zipfilepath, source, arcpath, env = None ):
     """ Add a file into a zip archive """
-
+    global ZIP_FILES
+    
     files = []
     _finalize_symbian_scons()
     if env is None:
@@ -318,13 +319,13 @@ def File2Zip(zipfilepath, source, arcpath, env = None ):
 
     zipfilepath = abspath( zipfilepath )
 
-    if zipfilepath not in ARGS.ZIP_FILES:
+    if zipfilepath not in ZIP_FILES:
         #import pdb;pdb.set_trace()
         # Create command
-        ARGS.ZIP_FILES[zipfilepath] = { "files" : files }
+        ZIP_FILES[zipfilepath] = { "files" : files }
         env.Command( zipfilepath, "", _zipfile)
     else:
-        files = ARGS.ZIP_FILES[zipfilepath]["files"]
+        files = ZIP_FILES[zipfilepath]["files"]
 
     env.Depends( zipfilepath, source )
     files.append( (source, arcpath) )
