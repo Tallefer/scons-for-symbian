@@ -146,8 +146,10 @@ def create_environment( target,
     if targettype != TARGETTYPE_LIB:
         if targettype in DLL_TARGETTYPES:
             defines.append( "__DLL__" )
+            LIBRARIES.append( join(EPOC32_RELEASE, "edll.lib") )
         else:
             defines.append( "__EXE__" )
+            LIBRARIES.append( join(EPOC32_RELEASE, "eexe.lib") )
     defines = [ '"%s"' % x for x in defines ]
 
     cc_flags = '-g -O0 -inline off -wchar_t off -align 4 -warnings on -w nohidevirtual,nounusedexpr -msgstyle gcc -enum int -str pool -exc ms -trigraphs on  -nostdinc'
@@ -163,7 +165,7 @@ def create_environment( target,
     if targettype in DLL_TARGETTYPES:
         LINKFLAGS = " ".join( [
                     '-msgstyle gcc',
-                    '-stdlib "%s"' % join( EPOC32_RELEASE, 'edll.lib'),
+                    '-stdlib',
                     '-noentry -shared',
                     '-subsystem %s' % win32_subsystem,
                     '-g',
@@ -179,7 +181,7 @@ def create_environment( target,
     elif targettype == TARGETTYPE_EXE:
         LINKFLAGS = " ".join( [
                     '-msgstyle gcc',
-                    '-stdlib ' + join( EPOC32_RELEASE, 'eexe.lib'),
+                    '-stdlib',
                     '-m "?_E32Bootstrap@@YGXXZ"',
                     '-subsystem %s' % win32_subsystem,
                     '-g',
