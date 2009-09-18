@@ -108,7 +108,7 @@ def write( line, color ):
     """Write line with color"""
     global CONSOLE
 
-    if os.name == "posix" and sys.stdout.isatty():        
+    if os.name == "posix" and sys.__stdout__.isatty():        
         return _handle_posix_write( line, color )  
     
     elif CONSOLE is not None:
