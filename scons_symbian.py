@@ -50,8 +50,8 @@ sysout( "Building", ARGS.COMPILER, ARGS.RELEASE )
 sysout( "Defines", ARGS.CMD_LINE_DEFINES )
 
 # in template
-# ARGS.UID1 = 0x100039ce for exe
-# ARGS.UID1 = 0x00000000 for dll
+# UID1 = 0x100039ce for exe
+# UID1 = 0x00000000 for dll
 
 def _create_environment( *env_args, **kwargs ):
     """Environment factory. Get correct environment for selected compiler."""
@@ -311,7 +311,7 @@ ZIP_FILES = {}
 def File2Zip(zipfilepath, source, arcpath, env = None ):
     """ Add a file into a zip archive """
     global ZIP_FILES
-    
+
     files = []
     _finalize_symbian_scons()
     if env is None:
@@ -885,7 +885,8 @@ class SymbianProgramHandler(object):
 
         if output_lib:
             libname = self.target + ".dso"
-            self.output_libpath = ( ARGS.INSTALL_EPOCROOT + r"epoc32/release/%s/%s/%s" % ( "armv5", "lib", libname ) )
+            self.output_libpath = ( join(ARGS.INSTALL_EPOCROOT,
+                                   r"/epoc32/release/%s/%s/%s" % ( "armv5", "lib", libname ) ) )
 
         build_prog = None
         if self.targettype != ARGS.TARGETTYPE_LIB:
@@ -895,6 +896,9 @@ class SymbianProgramHandler(object):
             for libname in self.libraries:
                 env.Depends( build_prog, libname )
 
+            env.Depends( build_prog, [ join( ARGS.INSTALL_EPOC32, "release", "armv5", "lib",
+                                            libname ) for libname in self.user_libraries] )
+
             # Mark the lib as a resultable also
             resultables = [ self._result_template % ( "" ) ]
             if output_lib:
@@ -903,12 +907,13 @@ class SymbianProgramHandler(object):
             # Create final binary and lib/dso
             env.Elf( resultables, elf_dll_path )#IGNORE:E1101
 
-            env.Install( ARGS.INSTALL_EPOCROOT + r"epoc32/release/gcce/%s" % ( ARGS.RELEASE ),
+            env.Install( join(ARGS.INSTALL_EPOCROOT + r"epoc32/release/gcce/%s" % ( ARGS.RELEASE )),
                          ".".join( [resultables[0], self.targettype] ) )
         else:
             build_prog = env.StaticLibrary( self._result_template % ".lib" , self.sources )#IGNORE:E1101
             self.output_libpath = ( self._result_template % ".lib",
-                                    ARGS.INSTALL_EPOCROOT + r"epoc32/release/armv5/%s/%s.lib" % ( ARGS.RELEASE, self.target ) )
+                                    join(ARGS.INSTALL_EPOCROOT,
+                                         r"epoc32/release/armv5/lib/%s.lib" % ( self.target ) ) )
 
         return build_prog
 

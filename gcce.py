@@ -11,6 +11,7 @@ __license__ = "MIT License"
 from SCons.Builder import Builder
 from SCons.Environment import Environment
 from arguments import * #IGNORE:W0611
+import arguments as ARGS
 from os import path
 from os.path import join
 import os
@@ -29,7 +30,7 @@ DEFAULT_GCCE_DEFINES += [
 SYMBIAN_ARMV5_LIBPATH = [ EPOCROOT ] + "epoc32 release armv5".split()
 SYMBIAN_ARMV5_LIBPATHDSO = join( *( SYMBIAN_ARMV5_LIBPATH + [ "lib" ] ) ) + path.sep
 SYMBIAN_ARMV5_LIBPATHLIB = join( *( SYMBIAN_ARMV5_LIBPATH + [ RELEASE ] ) ) + path.sep
- 
+
 SYMBIAN_ARMV5_BASE_LIBRARIES = [ SYMBIAN_ARMV5_LIBPATHLIB + __x + ".lib" for __x in [ "usrt2_2" ] ]
 DSO_LIBS = [ "drtaeabi", "dfprvct2_2", "dfpaeabi", "scppnwdl" , "drtrvct2_2" ]
 SYMBIAN_ARMV5_BASE_LIBRARIES += [ SYMBIAN_ARMV5_LIBPATHDSO + __x + ".dso" for __x in DSO_LIBS ]
@@ -38,7 +39,7 @@ SYMBIAN_ARMV5_BASE_LIBRARIES += [ SYMBIAN_ARMV5_LIBPATHDSO + __x + ".dso" for __
 WARNINGS_C = "-Wall -Wno-unknown-pragmas -fexceptions " \
             "-march=armv5t -mapcs -pipe -nostdinc -msoft-float"
 WARNINGS_CXX = WARNINGS_C + " -Wno-ctor-dtor-privacy"
-            
+
 
 #: Environment cache
 _GCCE_ENV = None
@@ -48,6 +49,7 @@ def create_environment( target,
                         includes,
                         sysincludes,
                         libraries,
+                        user_libraries,
                         uid2,
                         uid3,
                         sid = None,
@@ -61,38 +63,38 @@ def create_environment( target,
                         gcce_options = None,
                         elf2e32_args = None,
                         **kwargs ):
-    """Create GCCE building environment    
-    
+    """Create GCCE building environment
+
     @param allowdlldata: False to disable dll data support
     @type  allowdlldata: bool
-    
+
     @param epocstacksize: Size of stack for executable.
     @type  epocstacksize: int
-    
-	@param epocheapsize: Minimum and maximum heap size
-	@type epocheapsize: 2-tuple( int, int )
+
+    @param epocheapsize: Minimum and maximum heap size
+    @type epocheapsize: 2-tuple( int, int )
     @param kwargs: ignored keyword arguments.
     @see: L{scons_symbian.SymbianProgram}
     """
-    
-    
+
+
     defines = defines[:]
-    
+
     if gcce_options is None:
         gcce_options = GCCE_OPTIMIZATION_FLAGS
-    
+
     if targettype != TARGETTYPE_LIB:
         if targettype in DLL_TARGETTYPES:
             defines.append( "__DLL__" )
         else:
             defines.append( "__EXE__" )
-        
+
     defines.extend( DEFAULT_GCCE_DEFINES )
     defines.extend( CMD_LINE_DEFINES )
 
     LIBARGS = [ "-lsupc++", "-lgcc" ]
     LIBPATH = SYMBIAN_ARMV5_LIBPATHDSO
-    
+
     # GCCE uses .dso instead of .lib
     # Add .dso if file extension does not exist
     for x in xrange( len( libraries ) ):
@@ -106,7 +108,7 @@ def create_environment( target,
             pass
         else:
             libraries[x] = SYMBIAN_ARMV5_LIBPATHLIB + lib
-            
+
     if targettype == TARGETTYPE_EXE:
         libraries.append( SYMBIAN_ARMV5_LIBPATHDSO + "eikcore.dso" )
     else:
@@ -121,17 +123,19 @@ def create_environment( target,
                 libraries.append( SYMBIAN_ARMV5_LIBPATHLIB + "edllstub.lib" )
                 libraries.append( lib )
                 break
-        
+
+    USER_LIBPATH = join(ARGS.INSTALL_EPOC32, "release", "armv5", "lib")
+    libraries +=  [ os.path.normpath( os.path.join(USER_LIBPATH, x) ).lower() for x in user_libraries ]
     libraries = libraries + SYMBIAN_ARMV5_BASE_LIBRARIES
     libraries += LIBARGS
-   
+
     # Cleanup
     libraries = [ x.replace( "\\\\", "/" ) for x in libraries ]
-    
+
     COMPILER_INCLUDE = os.path.abspath( join( EPOC32_INCLUDE, "gcce", "gcce.h" ) )
 
     # TODO: Cleanup following mess
-    
+
     # Create linker flags
     LINKFLAGS = r"""
                     --target1-abs --no-undefined -nostdlib
@@ -150,7 +154,7 @@ def create_environment( target,
                     --entry _E32Dll -u _E32Dll
                     %(EPOCROOT)sepoc32/release/armv5/urel/edll.lib
                     """
-    
+
     LINKFLAGS += r"""
                   -Map %(EPOCROOT)sepoc32/release/gcce/urel/%(TARGET)s.%(TARGETTYPE)s.map
                   """
@@ -163,7 +167,7 @@ def create_environment( target,
                              "TARGET" : target,
                              "TARGETTYPE"   : targettype,
                              "EPOCROOT" : EPOCROOT }
-    
+
     #--vid=0x00000000
     ELF2E32 = r"""
                 %(EPOCROOT)sepoc32/tools/elf2e32 --sid=%(SID)s
@@ -178,7 +182,7 @@ def create_environment( target,
                 """
     if allowdlldata and targettype in DLL_TARGETTYPES:
         ELF2E32 += "--dlldata "
-    
+
     if epocstacksize is not None and targettype == TARGETTYPE_EXE:
         ELF2E32 += "--stack=" + "0x" + hex( epocstacksize ).replace( "0x", "" ).zfill( 8 )
     # TODO: Defined in both gcce.py and winscw.py. Relocate check to upper level
@@ -193,7 +197,7 @@ def create_environment( target,
     ELF2E32 = " ".join( [ x.strip() for x in ELF2E32.split( "\n" ) ] )
     if elf2e32_args is not None:
         ELF2E32 += " " + elf2e32_args
-        
+
     defconfig = ""
     # Based on targettype
     #uid1 = "0x1000007a" # Exe
@@ -216,71 +220,71 @@ def create_environment( target,
         defconfig += ["--unfrozen" ]
         defconfig += ["--dso " + os.environ["EPOCROOT"] + "epoc32/release/ARMV5/LIB/" + target + ".dso"]
         defconfig = " ".join( defconfig )
-        
+
         uid1 = TARGETTYPE_UID_MAP[TARGETTYPE_DLL]#"0x10000079" # DLL
-    
-    
-    global _GCCE_ENV    
+
+
+    global _GCCE_ENV
     if _GCCE_ENV is None:
-        _GCCE_ENV = Environment ( 
+        _GCCE_ENV = Environment (
                     tools = ["mingw"], # Disable searching of tools
                     ENV = os.environ,
                     # Static library settings
                     AR = r'arm-none-symbianelf-ar',
                     RANLIBCOM = "",
                     LIBPREFIX = "",
-                    
+
                     # Compiler settings
                     CC = r'arm-none-symbianelf-g++',
                     CFLAGS = WARNINGS_C + " " + gcce_options + " -x c -include " + COMPILER_INCLUDE,
-                    
+
                     CXX = r'arm-none-symbianelf-g++',
                     CXXFLAGS = WARNINGS_CXX + " " + gcce_options + " -x c++ -include %s " % ( COMPILER_INCLUDE ),
-                    
+
                     # isystem does not work so just adding the system include paths before normal includes.
                     CPPPATH = sysincludes + includes,
                     CPPDEFINES = defines,
                     INCPREFIX = "-I ",
-                    
+
                     # Linker settings
                     LINK = r'"arm-none-symbianelf-ld"',
                     LIBPATH = [ PATH_ARM_TOOLCHAIN + x for x in [
                                 r"/../lib/gcc/arm-none-symbianelf/3.4.3",
                                 r"/../arm-none-symbianelf/lib"
-                                ] 
+                                ]
                               ],
                     LINKFLAGS = LINKFLAGS,
                     LIBS = libraries,
                     LIBLINKPREFIX = " ",
                     PROGSUFFIX = ".noelfexe"
                 )
-        env = _GCCE_ENV        
+        env = _GCCE_ENV
     else:
-        # A lot faster than creating the environment from scratch               
-        env = _GCCE_ENV.Clone()        
-    
-    env.Replace(         
+        # A lot faster than creating the environment from scratch
+        env = _GCCE_ENV.Clone()
+
+    env.Replace(
         ENV = os.environ,
-                        
-        CFLAGS = WARNINGS_C + " " + gcce_options + " -x c -include " + COMPILER_INCLUDE,                
+
+        CFLAGS = WARNINGS_C + " " + gcce_options + " -x c -include " + COMPILER_INCLUDE,
         CXXFLAGS = WARNINGS_CXX + " " + gcce_options + " -x c++ -include %s " % ( COMPILER_INCLUDE ),
-        
+
         # isystem does not work so just adding the system include paths before normal includes.
         CPPPATH = sysincludes + includes,
-        CPPDEFINES = defines,        
-        
-        # Linker settings                
+        CPPDEFINES = defines,
+
+        # Linker settings
         LINKFLAGS = LINKFLAGS,
-        LIBS = libraries,    
+        LIBS = libraries,
     )
-    
-    
+
+
     # Add GCC binaries to path head, so we are sure to use them instead of some other (Cygwin, Carbide)
     # TODO: Windows specific
-    # Commented out... these really don't belong here. 
+    # Commented out... these really don't belong here.
     # What if somebody uses different path or another GCCE compiler version?... like I do.
     #env.PrependENVPath( 'PATH', 'C:\\Program Files\\CSL Arm Toolchain\\libexec\\gcc\\arm-none-symbianelf\\3.4.3' )
-    #env.PrependENVPath( 'PATH', 'C:\\Program Files\\CSL Arm Toolchain\\arm-none-symbianelf\\bin' )     
+    #env.PrependENVPath( 'PATH', 'C:\\Program Files\\CSL Arm Toolchain\\arm-none-symbianelf\\bin' )
 
     # Add special builders------------------------------------------------------
 
@@ -296,14 +300,14 @@ def create_environment( target,
                           "UID3"        : uid3,
                           "SID"         : sid,
                           "DEFCONFIG"   : defconfig }
- 
+
     elf2e32_builder = Builder( action = elf2e32_cmd.replace( "\\", "/" ),
                        src_suffix = ".noelfexe",
                        suffix = "." + targettype,
                        single_source = True,
                      )
     env.Append( BUILDERS = { "Elf" : elf2e32_builder } )
-    
+
     #env["SPAWN"] = spawn.win32_spawn
-    
+
     return env
