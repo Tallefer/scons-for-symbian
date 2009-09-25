@@ -125,7 +125,9 @@ def create_environment( target,
                 break
 
     USER_LIBPATH = join(ARGS.INSTALL_EPOC32, "release", "armv5", "lib")
-    libraries +=  [ os.path.normpath( os.path.join(USER_LIBPATH, x) ).lower() for x in user_libraries ]
+    # Link to user_libraries first so that they can override symbols
+    libraries = [ os.path.normpath( os.path.join(USER_LIBPATH, x) ).lower()
+                  for x in user_libraries ] + libraries
     libraries = libraries + SYMBIAN_ARMV5_BASE_LIBRARIES
     libraries += LIBARGS
 

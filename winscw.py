@@ -138,7 +138,11 @@ def create_environment( target,
 
     LIBPATH = SYMBIAN_WINSCW_LIBPATHLIB
     USER_LIBPATH = ARGS.INSTALL_EPOC32_RELEASE
-    LIBRARIES = [ os.path.normpath( LIBPATH + x ).lower() for x in libraries ] + [ os.path.normpath( os.path.join(USER_LIBPATH, x) ).lower() for x in user_libraries ] + win32_libraries
+    # Link first against user_libraries so that they can override symbols
+    LIBRARIES = (
+        [ os.path.normpath( os.path.join(USER_LIBPATH, x) ).lower() for x in user_libraries ] +
+        [ os.path.normpath( LIBPATH + x ).lower() for x in libraries ] +
+        win32_libraries )
     defines.extend( DEFAULT_WINSCW_DEFINES )
     defines.extend( CMD_LINE_DEFINES )
 
