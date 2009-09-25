@@ -684,9 +684,10 @@ class SymbianProgramHandler(object):
         if self.icons is None:
             return
 
-        sdk_data_resource = ARGS.EPOCROOT + r"epoc32/DATA/Z/resource/apps/%s"
-        sdk_resource = join( ARGS.EPOCROOT + r"epoc32", "release", ARGS.COMPILER,
-                         ARGS.RELEASE, "z", "resource", "apps", "%s" )
+        sdk_data_resource = join(ARGS.INSTALL_EPOCROOT,
+                                 r"epoc32/DATA/Z/resource/apps/%s")
+        sdk_resource = join( ARGS.INSTALL_EPOCROOT + r"epoc32", "release", ARGS.COMPILER,
+                         ARGS.INSTALL_EPOC32_RELEASE, "z", "resource", "apps", "%s" )
 
         icon_target_path = join( self.output_folder, "%s_aif.mif" )
         icon_targets = [] # Icons at WINSCW/...
