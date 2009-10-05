@@ -13,8 +13,7 @@ import sys
 #: Pyreadline console
 CONSOLE = None
 try:
-    import platform
-    if platform.system() == "Windows":
+    if os.name == "nt":
         import pyreadline
         CONSOLE = pyreadline.GetOutputFile()
 except ImportError: #IGNORE:W0704
