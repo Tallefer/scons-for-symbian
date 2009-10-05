@@ -101,13 +101,9 @@ def create_environment( target,
         lib = libraries[x]
         if "." not in lib:
             lib += ".dso"
-
-        if ".dso" in lib.lower():
+ 
+        if not lib.endswith(".o"): # Allows prebuilt object files
             libraries[x] = LIBPATH + lib
-        elif lib.endswith(".o"): # Allows prebuilt object files
-            pass
-        else:
-            libraries[x] = SYMBIAN_ARMV5_LIBPATHLIB + lib
 
     if targettype == TARGETTYPE_EXE:
         libraries.append( SYMBIAN_ARMV5_LIBPATHDSO + "eikcore.dso" )
