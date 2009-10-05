@@ -7,6 +7,7 @@ from SCons.Script import ARGUMENTS, DefaultEnvironment, HelpFunction as Help
 from SCons.Variables import Variables, EnumVariable
 from config import * #IGNORE:W0611
 from os.path import join, abspath
+from echoutil import loginfo
 import os
 import sys
 
@@ -14,17 +15,10 @@ import sys
 #: and Epydoc.
 RUNNING_SCONS = ( "scons" in sys.argv[0] or "-c" == sys.argv[0] )
 
-def sysout(*args):
-    if not RUNNING_SCONS: return
-
-    for a in args:
-        print a,
-    print
-
 VARS = Variables( 'arguments.py' )
 def GetArg( name, helpmsg, default, allowed_values = None, caseless = True ):
     """Utility for adding help information and retrieving argument"""
-
+    
     if allowed_values is not None:
         VARS.Add( EnumVariable( name, helpmsg, default,
                     allowed_values = allowed_values,
@@ -38,7 +32,7 @@ def GetArg( name, helpmsg, default, allowed_values = None, caseless = True ):
 
 #: Symbian SDK folder
 EPOCROOT = os.environ.get( "EPOCROOT", EPOCROOT )
-sysout( "EPOCROOT=%s" % EPOCROOT )
+loginfo( "EPOCROOT=%s" % EPOCROOT )
 
 #: Constant pointing to EPOCROOT/epoc32
 EPOC32 = join( EPOCROOT, 'epoc32' )
@@ -104,7 +98,7 @@ def ResolveInstallDirectories():
   INSTALL_EPOCROOT = _set_install_epocroot or EPOCROOT
   INSTALL_EPOCROOT = GetArg("install_epocroot", "Final output directory root, "
                             "if different from EPOCROOT", INSTALL_EPOCROOT)
-  sysout( "INSTALL_EPOCROOT=%s" % INSTALL_EPOCROOT )
+  loginfo( "INSTALL_EPOCROOT=%s" % INSTALL_EPOCROOT )
 
   #: Constant pointing to INSTALL_EPOCROOT/epoc32
   INSTALL_EPOC32 = join( INSTALL_EPOCROOT, 'epoc32' )
@@ -183,13 +177,13 @@ try:
         __import__( "ensymble" )
         ENSYMBLE_AVAILABLE = True
 except ImportError:
-    sysout( "Info: Automatic SIS creation requires Ensymble." )
+    loginfo( "Automatic SIS creation requires Ensymble." )
 
 if COMPILER == COMPILER_WINSCW:
     DO_CREATE_SIS = False
 
 if not DO_CREATE_SIS:
-    sysout( "Info: SIS creation disabled" )
+    loginfo( "SIS creation disabled" )
 
 #: Constant for ui platform version
 UI_VERSION = ( 3, 0 )
@@ -267,8 +261,8 @@ _resolve_platform()
 #: Location for the packages. Value generated in run-time.
 PACKAGE_FOLDER = abspath( join( "build%d_%d" % SYMBIAN_VERSION, "%s_%s" % ( COMPILER, RELEASE ), "packages" ) )
 
-sysout( "Info: Symbian OS version = %d.%d" % SYMBIAN_VERSION )
-sysout( "Info: UI platform        = %s" % UI_PLATFORM, "%d.%d" % UI_VERSION )
+loginfo( "Symbian OS version = %d.%d" % SYMBIAN_VERSION )
+loginfo( "UI platform        = %s" % UI_PLATFORM, "%d.%d" % UI_VERSION )
 
 #: Built components. One SConstruct can define multiple SymbianPrograms.
 #: This can be used from command-line to build only certain SymbianPrograms

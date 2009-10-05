@@ -4,6 +4,16 @@ Main S4S module
 #pylint: disable-msg=E0611
 from SCons.Builder import Builder
 from SCons.Script import (Command, Copy, DefaultEnvironment, Install, Mkdir, Clean, Default)
+from SCons.Node.FS import File
+
+# This will speed up startup.
+# See http://osdir.com/ml/programming.tools.scons.user/2006-05/msg00112.html
+# Tested with LogMan.
+# Before: 10 loops, best of 1: 2.68 sec per loop
+# After : 10 loops, best of 1: 2 sec per loop
+from SCons.Defaults import *
+SCons.Defaults.DefaultEnvironment(tools = [])
+
 import arguments as ARGS
 # TODO(mika.raento): previously scons_symbian imported all names from
 # arguments.py, including all the names that it imported from config.
@@ -16,7 +26,8 @@ import arguments as ARGS
 # This should be replaced by having the 'constants' in arguments.py be mutable
 # proxy objects to strings.
 from config import *
-from arguments import sysout, get_output_folder, RUNNING_SCONS, VARS, EPOCROOT, EPOC32, EPOC32_DATA, EPOC32_INCLUDE, EPOC32_TOOLS, EPOC32_RELEASE, PYTHON_COMPILER, PYTHON_DOZIP, COMPILER, RELEASE, GCCE_OPTIMIZATION_FLAGS, WINSCW_OPTIMIZATION_FLAGS, MMP_EXPORT_ENABLED, DO_CREATE_SIS, DO_DUPLICATE_SOURCES, ENSYMBLE_AVAILABLE, UI_VERSION, SYMBIAN_VERSION, PLATFORM_HEADER, PACKAGE_FOLDER, COMPONENTS, COMPONENTS_EXCLUDE, CMD_LINE_DEFINES, CMD_LINE_LIBS, STANDARD_DEFINES, EXTRA_DEFINES, DEFAULT_SYMBIAN_DEFINES, HELP_ENABLED, PATH_ARM_TOOLCHAIN
+from echoutil import loginfo
+from arguments import get_output_folder, RUNNING_SCONS, VARS, EPOCROOT, EPOC32, EPOC32_DATA, EPOC32_INCLUDE, EPOC32_TOOLS, EPOC32_RELEASE, PYTHON_COMPILER, PYTHON_DOZIP, COMPILER, RELEASE, GCCE_OPTIMIZATION_FLAGS, WINSCW_OPTIMIZATION_FLAGS, MMP_EXPORT_ENABLED, DO_CREATE_SIS, DO_DUPLICATE_SOURCES, ENSYMBLE_AVAILABLE, UI_VERSION, SYMBIAN_VERSION, PLATFORM_HEADER, PACKAGE_FOLDER, COMPONENTS, COMPONENTS_EXCLUDE, CMD_LINE_DEFINES, CMD_LINE_LIBS, STANDARD_DEFINES, EXTRA_DEFINES, DEFAULT_SYMBIAN_DEFINES, HELP_ENABLED, PATH_ARM_TOOLCHAIN
 from os.path import join, basename, abspath
 import zipfile
 import py_compile
@@ -39,6 +50,18 @@ __license__ = "MIT License"
 #: Handle to console for colorized output( and process launching )
 _OUTPUT_COLORIZER = colorizer.OutputConsole()
 
+def publicapi(func, *args,**kwargs):
+    """ Decorator for public APIs to initialize system """
+    def dummy(*args,**kwargs): pass
+    
+    def api(*args,**kwargs):
+        _finalize_symbian_scons()
+        return func(*args,**kwargs)
+    
+    if ARGS.HELP_ENABLED: return dummy; 
+    
+    return api
+
 def _finalize_symbian_scons():
   if ARGS.ResolveInstallDirectories():
     # Set ARGS.INSTALL_EPOCROOT as default target, so the stuff will be
@@ -46,8 +69,8 @@ def _finalize_symbian_scons():
     Default( ARGS.INSTALL_EPOCROOT )
     Default( "." )
 
-sysout( "Building", ARGS.COMPILER, ARGS.RELEASE )
-sysout( "Defines", ARGS.CMD_LINE_DEFINES )
+loginfo( "Building", ARGS.COMPILER, ARGS.RELEASE )
+loginfo( "Defines =", ARGS.CMD_LINE_DEFINES )
 
 # in template
 # UID1 = 0x100039ce for exe
@@ -56,7 +79,6 @@ sysout( "Defines", ARGS.CMD_LINE_DEFINES )
 def _create_environment( *env_args, **kwargs ):
     """Environment factory. Get correct environment for selected compiler."""
     env = None
-
     if ARGS.COMPILER == ARGS.COMPILER_GCCE:
         env = gcce.create_environment( *env_args, **kwargs )
     elif ARGS.COMPILER == ARGS.COMPILER_WINSCW:
@@ -64,6 +86,12 @@ def _create_environment( *env_args, **kwargs ):
     else:
         msg = "Error: Environment for '%s' is not implemented" % ARGS.COMPILER
         raise NotImplementedError( msg )
+    
+    # These sped up LogMan build startup ~0.2s
+    #env.SetOption('max_drift', 4)
+    #env.SetOption('implicit_cache', 1)
+    #env.SetOption('diskcheck', None)
+
     return env
 
 def SetInstallDirectory(dir):
@@ -75,7 +103,7 @@ def SetInstallDirectory(dir):
   """
   ARGS.SetInstallDirectory(dir)
 
-
+@publicapi
 def SymbianPackage( package, ensymbleargs = None, pkgargs = None,
                     pkgfile = None, extra_files = None, source_package = None,
                     env=None, startonboot = None,
@@ -114,8 +142,6 @@ def SymbianPackage( package, ensymbleargs = None, pkgargs = None,
     @param extra_files: Copy files to package folder and install for simulator( to SIS with Ensymble only )
     """
     # Skip processing to speed up help message
-    if ARGS.HELP_ENABLED: return
-    _finalize_symbian_scons()
     if not env:
         env = DefaultEnvironment()
 
@@ -271,6 +297,7 @@ def SymbianPackage( package, ensymbleargs = None, pkgargs = None,
     if ARGS.DO_CREATE_SIS:
         return create_install_file( PKG_HANDLER.Package(package).keys() )
 
+@publicapi
 def SymbianHelp( source, uid, env = None ):
     """ Generate help files for Context Help
     @param source: Help project file .cshlp"
@@ -280,7 +307,6 @@ def SymbianHelp( source, uid, env = None ):
     @rtype: 2-tuple
     """
     import cshlp
-    _finalize_symbian_scons()
     if env is None:
         env = DefaultEnvironment()
 
@@ -308,12 +334,12 @@ def _zipfile(target,source,env):
     z.close()
 
 ZIP_FILES = {}
+@publicapi
 def File2Zip(zipfilepath, source, arcpath, env = None ):
     """ Add a file into a zip archive """
     global ZIP_FILES
 
     files = []
-    _finalize_symbian_scons()
     if env is None:
         env = DefaultEnvironment()
 
@@ -345,10 +371,11 @@ def _py2pyc(target,source,env):
     os.system( cmd )
     return 0
 
+@publicapi
 def Python2ByteCode( source, target = ".pyc", env = None ):
     """ Utility to compile Python source into a byte code """
 
-    _finalize_symbian_scons()
+    
     if target in [".pyc", ".pyo"]:
         target = source.replace(".py", target)
 
@@ -363,6 +390,7 @@ def Python2ByteCode( source, target = ".pyc", env = None ):
 #: This information is be used to generate the pkg file.
 PKG_HANDLER = symbian_pkg.PKGHandler()
 
+@publicapi
 def ToPackage( env = None,     package_drive_map = None,
                package = None, target = None,
                source = None,  toemulator = True,
@@ -400,7 +428,6 @@ def ToPackage( env = None,     package_drive_map = None,
         if notnone is None:
             raise AttributeError( "Error: '%s' is None." % attr )
 
-    _finalize_symbian_scons()
     if env is None:
         env = DefaultEnvironment()
 
@@ -475,6 +502,7 @@ def ToPackage( env = None,     package_drive_map = None,
 
     return target
 
+@publicapi
 def SymbianProgram( target, targettype = None, #IGNORE:W0621
                     sources = None, includes = None,
                     libraries = None, user_libraries = None,
@@ -585,7 +613,6 @@ def SymbianProgram( target, targettype = None, #IGNORE:W0621
     """
 
     # Transforms arguments into keywords
-    _finalize_symbian_scons()
     kwargs.update( locals() )
 
     handler = SymbianProgramHandler( **kwargs )
@@ -662,6 +689,7 @@ class SymbianProgramHandler(object):
             os.close(fileid)
             os.remove(mifpath)
         else:
+            # TODO: Use source[0].rel_path ?
             from relpath import relpath
             source_icon = relpath(os.getcwd(), source[0].tpath)
             target_icon = target[0].tpath
@@ -772,7 +800,7 @@ class SymbianProgramHandler(object):
             if (  ARGS.COMPILER == ARGS.COMPILER_WINSCW and
                   self.targettype != ARGS.TARGETTYPE_LIB) or \
                 ARGS.COMPILER == ARGS.COMPILER_GCCE and self.targettype == ARGS.TARGETTYPE_LIB :
-
+                
                 s, t = self.output_libpath
                 postcommands.append( Copy( t, s ) )
                 installed.append( t )
@@ -883,7 +911,7 @@ class SymbianProgramHandler(object):
         output_lib   = ( self.targettype in ARGS.DLL_TARGETTYPES )
         elf_dll_path = self._result_template % ( "._elf_" + self.targettype )
         resultables  = [ elf_dll_path  ]
-
+        
         if output_lib:
             libname = self.target + ".dso"
             self.output_libpath = ( join(ARGS.INSTALL_EPOCROOT,
@@ -894,6 +922,7 @@ class SymbianProgramHandler(object):
             build_prog = self._env.Program( resultables, self.sources )#IGNORE:E1101
 
             # Depend on the libs
+            #import pdb;pdb.set_trace()
             for libname in self.libraries:
                 env.Depends( build_prog, libname )
 
@@ -961,7 +990,7 @@ class SymbianProgramHandler(object):
             env.Depends( uid_cpp_filename, caps_value )
 
             # We need to include the UID.cpp also
-            self.sources.append( uid_cpp_filename )
+            self.sources.append( self._env.File(uid_cpp_filename ) )
 
         # Compile the sources. Create object files( .o ) and temporary dll.
         output_lib = ( self.targettype in ARGS.DLL_TARGETTYPES )
@@ -1032,7 +1061,7 @@ class SymbianProgramHandler(object):
 
         # NOTE: If build folder is changed this does not work anymore.
         # List compiled sources and add to dependency list
-        object_paths = [ ".".join( x.split( "." )[: - 1] ) + ".o" for x in self.sources ] #IGNORE:W0631
+        object_paths = [ ".".join( x.path.split( "." )[: - 1] ) + ".o" for x in self.sources ] #IGNORE:W0631
 
         # Sources depend on the headers generated from .rss files.
         env.Depends( object_paths, self.resource_headers )
@@ -1117,16 +1146,14 @@ class SymbianProgramHandler(object):
         #pylint: enable-msg=W0201
 
     def Process(self):
-
-        # Skip processing to speed up help message
-        if ARGS.HELP_ENABLED: return
-
+        
         if self.target.lower().endswith( ".mmp" ):
             self._importMMP()
 
         # After mmp import
         self.output_folder = get_output_folder( ARGS.COMPILER, ARGS.RELEASE, self.target, self.targettype )
-
+        self.output_folder = os.path.abspath(self.output_folder)
+        
         if self.includes is None:
             self.includes = []
 
@@ -1203,25 +1230,6 @@ class SymbianProgramHandler(object):
         # Seems to work again without. What is going on here? Updated scons 1.1?
         #self.extra_depends.extend( self.sources )
 
-        # Convert File typed objects to str
-        # TODO: It would be better if we convert str to File instead
-        for x in xrange(len(self.sources)):
-            if type(self.sources[x]) != str:
-                self.sources[x] = self.sources[x].path
-        #self.sources = [ x.path for x in self.sources ]
-        self.origsources = self.sources[:]
-
-        tmp = []
-        updirs = []
-        for x in self.sources:
-            updirs.append( x.count("..") )
-            x = x.replace("..", "_up_")
-            x = join( self.output_folder, x )
-            tmp.append(x)
-
-        #self.sources = [ join( self.output_folder, x ) for x in self.sources ]
-        self.sources = tmp
-
         # This is often needed
         ARGS.FOLDER_TARGET_TUPLE = ( self.output_folder, self.target )
         Mkdir( self.output_folder )
@@ -1239,6 +1247,25 @@ class SymbianProgramHandler(object):
 
         kwargs["defoutput"] = self._result_template % ( "{000a0000}.def" )
         self._env = _create_environment( **kwargs )
+        
+        # Convert File typed objects to str
+        # TODO: It would be better if we convert str to File instead
+        for x in xrange(len(self.sources)):
+            if type(self.sources[x]) != str:
+                self.sources[x] = self.sources[x].path
+        #self.sources = [ x.path for x in self.sources ]
+        self.origsources = self.sources[:]
+
+        tmp = []
+        updirs = []
+        for x in self.sources:
+            updirs.append( x.count("..") )
+            x = x.replace("..", "_up_")
+            x = join( self.output_folder, x )
+            tmp.append(self._env.File(x))
+
+        #self.sources = [ join( self.output_folder, x ) for x in self.sources ]
+        self.sources = tmp
 
         # File duplication can be disabled with SCons's -n parameter to ease use of IDE(Carbide)
         # It seems that SCons is not always able to detect changes if duplication is disabled.
@@ -1332,3 +1359,6 @@ class SymbianProgramHandler(object):
         Clean( build_prog, self.output_folder )
 
         return build_prog
+
+del publicapi
+del File

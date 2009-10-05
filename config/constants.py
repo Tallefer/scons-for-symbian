@@ -62,3 +62,8 @@ UI_PLATFORM = ""
 # Extension added to sis files signed with signsis.
 SIGNSIS_OUTPUT_EXTENSION = ".sisx"
             
+#: Are we running a build? This is to avoid messing up code analyzers
+#: and Epydoc.
+import sys
+RUNNING_SCONS = ( "scons" in sys.argv[0] or "-c" == sys.argv[0] )            
+del sys
