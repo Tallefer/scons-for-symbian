@@ -116,6 +116,7 @@ def create_environment( target,
                         winscw_options = None,
                         win32_libraries = None,
                         win32_subsystem = None,
+                        win32_headers = False,
                         *args,
                         **kwargs
                         ):
@@ -156,7 +157,12 @@ def create_environment( target,
             LIBRARIES.append( join(EPOC32_RELEASE, "eexe.lib") )
     defines = [ '"%s"' % x for x in defines ]
 
-    cc_flags = '-g -O0 -inline off -wchar_t off -align 4 -warnings on -w nohidevirtual,nounusedexpr -msgstyle gcc -enum int -str pool -exc ms -trigraphs on  -nostdinc'
+    cc_flags = '-g -O0 -inline off -align 4 -warnings on -w nohidevirtual,nounusedexpr -msgstyle gcc -enum int -str pool -exc ms -trigraphs on'
+    if win32_headers:
+      # Win32 headers require the wchar_t type
+      cc_flags += ' -stdinc -wchar_t on'
+    else:
+      cc_flags += ' -nostdinc -wchar_t off '
     cc_flags = " ".join( [cc_flags, winscw_options ] )
 
      #%(EPOCROOT)sepoc32/RELEASE/WINSCW/UDEB/euser.lib %(EPOCROOT)sepoc32/release/WINSCW/UDEB/efsrv.lib

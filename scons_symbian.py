@@ -518,6 +518,7 @@ def SymbianProgram( target, targettype = None, #IGNORE:W0621
                     elf2e32_args = None,
                     win32_libraries = None,
                     win32_subsystem = None,
+                    win32_headers = False,
                     # Sis stuff
                     package = "",
                     package_drive_map = None,
@@ -585,6 +586,8 @@ def SymbianProgram( target, targettype = None, #IGNORE:W0621
 
     @param win32_subsystem: Subsystem for the resulting binary (default windows)
     @param win32_subsystem: str, either "windows" or "console"
+
+    @param win32_headers: Whether to add win32 include paths (default False)
 
     @param package:       Path to installer file. If given, an installer is automatically created.
                           The files are copied to L{arguments.PACKAGE_FOLDER} and
