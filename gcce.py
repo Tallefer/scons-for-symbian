@@ -95,15 +95,19 @@ def create_environment( target,
     LIBARGS = [ "-lsupc++", "-lgcc" ]
     LIBPATH = SYMBIAN_ARMV5_LIBPATHDSO
 
-    # GCCE uses .dso instead of .lib
-    # Add .dso if file extension does not exist
     for x in xrange( len( libraries ) ):
         lib = libraries[x]
+        # GCCE uses .dso instead of .lib for dynamic libs. .lib indicates
+        # static lib
+
+        # Add .dso if file extension does not exist
         if "." not in lib:
             lib += ".dso"
- 
-        if not lib.endswith(".o"): # Allows prebuilt object files
+
+        if ".dso" in lib.lower():
             libraries[x] = LIBPATH + lib
+        elif not lib.endswith(".o"): # Allows prebuilt object files
+            libraries[x] = SYMBIAN_ARMV5_LIBPATHLIB + lib
 
     if targettype == TARGETTYPE_EXE:
         libraries.append( SYMBIAN_ARMV5_LIBPATHDSO + "eikcore.dso" )
@@ -120,10 +124,20 @@ def create_environment( target,
                 libraries.append( lib )
                 break
 
-    USER_LIBPATH = join(ARGS.INSTALL_EPOC32, "release", "armv5", "lib")
+    USER_LIBPATH = join(ARGS.INSTALL_EPOC32, "release", "armv5", RELEASE)
+    USER_DSOPATH = join(ARGS.INSTALL_EPOC32, "release", "armv5", "lib")
+    for x in xrange( len( user_libraries ) ):
+        lib = user_libraries[x]
+        if "." not in lib:
+            lib += ".dso"
+
+        if ".dso" in lib.lower():
+            user_libraries[x] = join(USER_DSOPATH, lib)
+        elif not lib.endswith(".o"): # Allows prebuilt object files
+            user_libraries[x] = join(USER_LIBPATH, lib)
+
     # Link to user_libraries first so that they can override symbols
-    libraries = [ os.path.normpath( os.path.join(USER_LIBPATH, x) ).lower()
-                  for x in user_libraries ] + libraries
+    libraries = [ os.path.normpath( x ).lower() for x in user_libraries ] + libraries
     libraries = libraries + SYMBIAN_ARMV5_BASE_LIBRARIES
     libraries += LIBARGS
 

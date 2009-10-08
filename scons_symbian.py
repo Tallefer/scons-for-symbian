@@ -53,13 +53,13 @@ _OUTPUT_COLORIZER = colorizer.OutputConsole()
 def publicapi(func, *args,**kwargs):
     """ Decorator for public APIs to initialize system """
     def dummy(*args,**kwargs): pass
-    
+
     def api(*args,**kwargs):
         _finalize_symbian_scons()
         return func(*args,**kwargs)
-    
-    if ARGS.HELP_ENABLED: return dummy; 
-    
+
+    if ARGS.HELP_ENABLED: return dummy;
+
     return api
 
 def _finalize_symbian_scons():
@@ -86,7 +86,7 @@ def _create_environment( *env_args, **kwargs ):
     else:
         msg = "Error: Environment for '%s' is not implemented" % ARGS.COMPILER
         raise NotImplementedError( msg )
-    
+
     # These sped up LogMan build startup ~0.2s
     #env.SetOption('max_drift', 4)
     #env.SetOption('implicit_cache', 1)
@@ -375,7 +375,7 @@ def _py2pyc(target,source,env):
 def Python2ByteCode( source, target = ".pyc", env = None ):
     """ Utility to compile Python source into a byte code """
 
-    
+
     if target in [".pyc", ".pyo"]:
         target = source.replace(".py", target)
 
@@ -803,7 +803,7 @@ class SymbianProgramHandler(object):
             if (  ARGS.COMPILER == ARGS.COMPILER_WINSCW and
                   self.targettype != ARGS.TARGETTYPE_LIB) or \
                 ARGS.COMPILER == ARGS.COMPILER_GCCE and self.targettype == ARGS.TARGETTYPE_LIB :
-                
+
                 s, t = self.output_libpath
                 postcommands.append( Copy( t, s ) )
                 installed.append( t )
@@ -914,7 +914,7 @@ class SymbianProgramHandler(object):
         output_lib   = ( self.targettype in ARGS.DLL_TARGETTYPES )
         elf_dll_path = self._result_template % ( "._elf_" + self.targettype )
         resultables  = [ elf_dll_path  ]
-        
+
         if output_lib:
             libname = self.target + ".dso"
             self.output_libpath = ( join(ARGS.INSTALL_EPOCROOT,
@@ -946,7 +946,8 @@ class SymbianProgramHandler(object):
             build_prog = env.StaticLibrary( self._result_template % ".lib" , self.sources )#IGNORE:E1101
             self.output_libpath = ( self._result_template % ".lib",
                                     join(ARGS.INSTALL_EPOCROOT,
-                                         r"epoc32/release/armv5/lib/%s.lib" % ( self.target ) ) )
+                                         r"epoc32/release/armv5/%s/%s.lib" % (
+                                           ARGS.RELEASE, self.target ) ) )
 
         return build_prog
 
@@ -1149,14 +1150,14 @@ class SymbianProgramHandler(object):
         #pylint: enable-msg=W0201
 
     def Process(self):
-        
+
         if self.target.lower().endswith( ".mmp" ):
             self._importMMP()
 
         # After mmp import
         self.output_folder = get_output_folder( ARGS.COMPILER, ARGS.RELEASE, self.target, self.targettype )
         self.output_folder = os.path.abspath(self.output_folder)
-        
+
         if self.includes is None:
             self.includes = []
 
@@ -1250,7 +1251,7 @@ class SymbianProgramHandler(object):
 
         kwargs["defoutput"] = self._result_template % ( "{000a0000}.def" )
         self._env = _create_environment( **kwargs )
-        
+
         # Convert File typed objects to str
         # TODO: It would be better if we convert str to File instead
         for x in xrange(len(self.sources)):
