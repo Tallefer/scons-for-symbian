@@ -14,17 +14,20 @@ TARGETTYPE_EXE    = "exe"
 TARGETTYPE_LIB    = "lib"
 TARGETTYPE_PLUGIN = "plugin"
 TARGETTYPE_PYD    = "pyd"
+TARGETTYPE_APP    = "app"
     
 #: List of possible targettypes
 TARGETTYPES       = [ TARGETTYPE_DLL,
                       TARGETTYPE_EXE,
                       TARGETTYPE_LIB,
                       TARGETTYPE_PLUGIN,
-                      TARGETTYPE_PYD ]
+                      TARGETTYPE_PYD,
+                      TARGETTYPE_APP ]
 
 #: Types, which are compiled like dll( outputs lib )
 DLL_TARGETTYPES = [ TARGETTYPE_PLUGIN, TARGETTYPE_DLL, 
-                    TARGETTYPE_PYD, TARGETTYPE_LIB ]
+                    TARGETTYPE_PYD, TARGETTYPE_LIB,
+                    TARGETTYPE_APP ]
 
 #: Maps targettype to correct uid1
 TARGETTYPE_UID_MAP = {

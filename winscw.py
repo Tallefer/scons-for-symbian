@@ -16,22 +16,40 @@ DEFAULT_WINSCW_DEFINES += [
                         ]
 SYMBIAN_WINSCW_LIBPATHLIB = EPOCROOT + r"epoc32/release/winscw/udeb/"
 
-#: UID.cpp for WINSCW simulator
-TARGET_UID_CPP_TEMPLATE_DLL = r"""
-// scons-generated uid source file
-#include <e32cmn.h>
-#pragma data_seg(".SYMBIAN")
-__EMULATOR_IMAGE_HEADER2(0x10000079,0x00000000,0x00000000,EPriorityForeground,%(CAPABILITIES)su,0x00000000u,0x00000000,0,0x00010000,0)
-#pragma data_seg()
-"""
-#: UID.cpp for WINSCW simulator
-TARGET_UID_CPP_TEMPLATE_EXE = r"""
-// scons-generated uid source file
-#include <e32cmn.h>
-#pragma data_seg(".SYMBIAN")
-__EMULATOR_IMAGE_HEADER2(0x1000007a,0x100039ce,%(UID3)s,EPriorityForeground,%(CAPABILITIES)su,0x00000000u,%(SID)s,0x00000000,0x00010000,0)
-#pragma data_seg()
-"""
+if ARGS.SYMBIAN_VERSION[0] > 8:
+  #: UID.cpp for WINSCW simulator
+  TARGET_UID_CPP_TEMPLATE_DLL = r"""
+  // scons-generated uid source file
+  #include <e32cmn.h>
+  #pragma data_seg(".SYMBIAN")
+  __EMULATOR_IMAGE_HEADER2(0x10000079,0x00000000,0x00000000,EPriorityForeground,%(CAPABILITIES)su,0x00000000u,0x00000000,0,0x00010000,0)
+  #pragma data_seg()
+  """
+  #: UID.cpp for WINSCW simulator
+  TARGET_UID_CPP_TEMPLATE_EXE = r"""
+  // scons-generated uid source file
+  #include <e32cmn.h>
+  #pragma data_seg(".SYMBIAN")
+  __EMULATOR_IMAGE_HEADER2(0x1000007a,0x100039ce,%(UID3)s,EPriorityForeground,%(CAPABILITIES)su,0x00000000u,%(SID)s,0x00000000,0x00010000,0)
+  #pragma data_seg()
+  """
+else:
+  #: UID.cpp for WINSCW simulator
+  TARGET_UID_CPP_TEMPLATE_DLL = r"""
+  // scons-generated uid source file
+  #include <e32std.h>
+  #pragma data_seg(".E32_UID")
+  __WINS_UID(0x10000079,%(UID2)s,%(UID3)s)
+  #pragma data_seg()
+  """
+  #: UID.cpp for WINSCW simulator
+  TARGET_UID_CPP_TEMPLATE_EXE = r"""
+  // scons-generated uid source file
+  #include <e32cmn.h>
+  #pragma data_seg(".SYMBIAN")
+  __EMULATOR_IMAGE_HEADER2(0x1000007a,0x100039ce,%(UID3)s,EPriorityForeground,%(CAPABILITIES)su,0x00000000u,%(SID)s,0x00000000,0x00010000,0)
+  #pragma data_seg()
+  """
 
 
 CAPABILITY_MAP = {
@@ -168,6 +186,9 @@ def create_environment( target,
      #%(EPOCROOT)sepoc32/RELEASE/WINSCW/UDEB/euser.lib %(EPOCROOT)sepoc32/release/WINSCW/UDEB/efsrv.lib
     LINKFLAGS = ""
     search_flag = ""
+    dll_entry = "__E32Dll"
+    if ARGS.SYMBIAN_VERSION[0] < 9:
+      dll_entry = "?_E32Dll@@YGHPAXI0@Z"
     if win32_libraries:
       # win32 libraries live in the linker's standard library folder, we don't
       # want to look for them, let the linker do that.
@@ -180,7 +201,7 @@ def create_environment( target,
                     '-subsystem %s' % win32_subsystem,
                     '-g',
                     '-export dllexport',
-                    '-m __E32Dll',
+                    '-m "%s"' % (dll_entry),
                     '-nocompactimportlib',
                     '-implib %(OUTPUT_FOLDER)s/%(TARGET)s._tmp_lib',
                     '-addcommand "out:%(TARGET)s._tmp_%(TARGETTYPE)s"',

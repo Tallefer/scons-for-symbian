@@ -873,7 +873,10 @@ class SymbianProgramHandler(object):
                 if rss_notype.endswith( "_reg" ):
                     installfolder.append( join( "private", "10003a3f", "import", "apps" ) )
                 else:
-                    installfolder.append( join( "resource", "apps" ) )
+                    if ARGS.SYMBIAN_VERSION[0] > 8:
+                      installfolder.append( join( "resource", "apps" ) )
+                    else:
+                      installfolder.append( join( "system", "apps", self.target ) )
                 installfolder = os.path.join( *installfolder )
 
                 rsc_filename = "%s.%s" % ( rss_notype, "rsc" )
@@ -902,7 +905,9 @@ class SymbianProgramHandler(object):
 
                     else: # Copy normal resources to resource/apps folder
                         self._env.Install( join( ARGS.INSTALL_EPOC32_DATA, "Z", "resource","apps"), converted_rsc )
-                        self._env.Install( join( ARGS.INSTALL_EPOC32_RELEASE, "Z", "resource", "apps"), converted_rsc )
+                        self._env.Install( join( ARGS.INSTALL_EPOC32_RELEASE,
+                                                "Z", "system", "apps",
+                                                self.target), converted_rsc )
 
                 # Depend on previous. TODO: Use SCons Preprocessor scanner.
                 if prev_resource is not None:
@@ -957,11 +962,14 @@ class SymbianProgramHandler(object):
         template = ""
         capabilities = winscw.make_capability_hex( self.capabilities )
         if self.targettype == ARGS.TARGETTYPE_EXE:
-            template = winscw.TARGET_UID_CPP_TEMPLATE_EXE % { "UID3": self.uid3,
+            template = winscw.TARGET_UID_CPP_TEMPLATE_EXE % { "UID2": self.uid2,
+                                                              "UID3": self.uid3,
                                                               "SID" : self.sid,
                                                               "CAPABILITIES": capabilities }
         else:
-            template = winscw.TARGET_UID_CPP_TEMPLATE_DLL % { "CAPABILITIES": capabilities }
+          template = winscw.TARGET_UID_CPP_TEMPLATE_DLL % { "UID2": self.uid2,
+                                                            "UID3": self.uid3,
+                                                            "CAPABILITIES": capabilities }
 
         f = open( target[0].path, 'w' );f.write( template );f.close()
 
@@ -987,11 +995,13 @@ class SymbianProgramHandler(object):
                           suffix = '.UID.cpp',
                           caps = self.capabilities )
             env.Append( BUILDERS = {'CreateUID' : bld} )
-            env.CreateUID( uid_cpp_filename, self.sources )#IGNORE:E1101
 
             # uid.cpp depends on the value of the capabilities
             caps_value = env.Value(self.capabilities)
-            env.Depends( uid_cpp_filename, caps_value )
+            env.CreateUID( uid_cpp_filename, [
+              caps_value,
+              env.Value(self.uid2),
+              env.Value(self.uid3) ] )#IGNORE:E1101
 
             # We need to include the UID.cpp also
             self.sources.append( self._env.File(uid_cpp_filename ) )
@@ -1049,8 +1059,11 @@ class SymbianProgramHandler(object):
             inffile = '-Inffile "%s" ' % ( self._result_template % ".inf" )
             defout  = ( self._result_template % '.def' )
             # Creates def file
-            makedef = r'perl -S %%EPOCROOT%%epoc32/tools/makedef.pl -absent __E32Dll %s %s "%s"' % \
-                    ( inffile, definput, defout )
+            absent_e32dll = "-absent __E32Dll"
+            if ARGS.SYMBIAN_VERSION[0] < 9:
+              absent_e32dll = ''
+            makedef = r'perl -S %%EPOCROOT%%epoc32/tools/makedef.pl %s %s %s "%s"' % \
+                    ( absent_e32dll, inffile, definput, defout )
 
             action = "\n".join( [
                 # Creates <target>.lib
@@ -1084,18 +1097,28 @@ class SymbianProgramHandler(object):
         win32_subsystem = self.win32_subsystem or "windows"
 
         if self.targettype in ARGS.DLL_TARGETTYPES and self.targettype != ARGS.TARGETTYPE_LIB:
+            final_output = self._result_template % ( "." + self.targettype )
+            implib = '-implib "%s"' % ( self._result_template % ".lib" )
+            noentry = '-noentry'
+            if self.targettype == ARGS.TARGETTYPE_APP:
+                env.Install( join(ARGS.INSTALL_EPOC32_RELEASE, "z", "system",
+                                  "apps", self.target),
+                             final_output )
+                implib = ''
+                noentry = ''
 
-            env.Command( self._result_template % ( "." + self.targettype ), [ temp_dll_path, self._result_template % ".def" ],
+            env.Command( final_output, [ temp_dll_path, self._result_template % ".def" ],
             [
                 " ".join( [
                             'mwldsym2 -msgstyle gcc',
-                            '-stdlib %EPOCROOT%epoc32/release/winscw/udeb/edll.lib -noentry',
+                            '-stdlib %EPOCROOT%epoc32/release/winscw/udeb/edll.lib',
+                            noentry,
                             '-shared -subsystem %s' % win32_subsystem,
                             '-g %s' % " ".join( libs ),
                             ' %s' % " ".join( win32_libs ),
                             '-o "%s"' % temp_dll_path,
                             '-f "%s"' % ( self._result_template % ".def" ),
-                            '-implib "%s"' % ( self._result_template % ".lib" ),
+                            implib,
                             '-addcommand "out:%s.%s"' % ( self.target, self.targettype ),
                             '-warnings off',
                             '-l %s' % " -l ".join( set( object_folders ) ),

@@ -18,7 +18,7 @@ RUNNING_SCONS = ( "scons" in sys.argv[0] or "-c" == sys.argv[0] )
 VARS = Variables( 'arguments.py' )
 def GetArg( name, helpmsg, default, allowed_values = None, caseless = True ):
     """Utility for adding help information and retrieving argument"""
-    
+
     if allowed_values is not None:
         VARS.Add( EnumVariable( name, helpmsg, default,
                     allowed_values = allowed_values,
@@ -315,8 +315,10 @@ if CMD_LINE_LIBS is not None:
 #: Default Symbian definitions.
 STANDARD_DEFINES = [ "__SYMBIAN32__",
                      "_UNICODE",
-                     "__SUPPORT_CPP_EXCEPTIONS__",
                    ]
+
+if SYMBIAN_VERSION[0] > 8:
+  STANDARD_DEFINES += [ "__SUPPORT_CPP_EXCEPTIONS__" ]
 
 # Add S60 macros
 EXTRA_DEFINES = []
