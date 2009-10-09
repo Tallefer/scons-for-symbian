@@ -301,8 +301,11 @@ def create_environment( target,
     # Add special builders------------------------------------------------------
 
     # Elf2e32 converter
+    capabilities_string = "+".join( capabilities )
+    if len(capabilities_string) == 0:
+      capabilities_string = "NONE"
     elf2e32_cmd = ELF2E32 % { "EPOCROOT"    : EPOCROOT,
-                          "CAPABILITIES": "+".join( capabilities ),
+                          "CAPABILITIES": capabilities_string,
                           "TARGET"      : target,
                           "release"     : RELEASE,
                           "WORKING_DIR" : "",#os.path.abspath( "." ),
