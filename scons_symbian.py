@@ -905,6 +905,7 @@ class SymbianProgramHandler(object):
 
                     else: # Copy normal resources to resource/apps folder
                         self._env.Install( join( ARGS.INSTALL_EPOC32_DATA, "Z", "resource","apps"), converted_rsc )
+                        self._env.Install( join( ARGS.INSTALL_EPOC32_RELEASE, "Z", "resource", "apps"), converted_rsc )
                         self._env.Install( join( ARGS.INSTALL_EPOC32_RELEASE,
                                                 "Z", "system", "apps",
                                                 self.target), converted_rsc )
