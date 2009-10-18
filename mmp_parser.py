@@ -203,6 +203,12 @@ class MMPParser:
         result["epocheapsize"] = ( hex(4096), hex(1024*1024 ))
         result["uid"] += [ None, None]
         for line in lines:                        
+            # Fixes Issue-5: mmp parser cannot handle comments
+            c_index = line.find("//")
+            if c_index != -1:
+                line = line[:c_index]
+            if line == "": continue
+            
             parts = line.split()
             keyword = parts[0].lower()
             if keyword in KEYWORDS:

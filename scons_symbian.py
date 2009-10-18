@@ -582,7 +582,7 @@ def SymbianIcon(icon, env = None, package = None, package_drive_map = None ):
     Example:
     >>> SymbianIcon( "myicon.svg", package = "myapp")
     => Creates myicon_aif.mif
-    >>> SymbianIcon( ("myicon.svg", "renamed.mif"), package = "myapp" )
+    >>> SymbianIcon( ("myicon.svg", "renamed"), package = "myapp" )
     => Creates renamed_aif.mif
     
     @param icon: The path to the source icon.
