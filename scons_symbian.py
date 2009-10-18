@@ -502,6 +502,135 @@ def ToPackage( env = None,     package_drive_map = None,
 
     return target
 
+def SymbianTargetPath(target, targettype = ""):
+    """ Return the result path for symbian target"""
+
+    p = get_output_folder( ARGS.COMPILER, ARGS.RELEASE, target, targettype )
+    if targettype == "":
+        p = p[:-1]
+    return os.path.abspath(p)
+
+def SymbianIconCommand(env, target, source):
+    """SCons command for running the mifconv icon conversion tool."""
+    
+    # Creates 32 bit icons
+    convert_icons_cmd = ( ARGS.EPOCROOT + r'epoc32/tools/mifconv "%s" /c32 "%s"' ).replace( "\\", "/" )
+
+    if os.name == 'nt':
+        source_icon = source[0].abspath
+        target_icon = target[0].abspath
+
+        # Copy the file to current drive. This fixes also issues with some(old)
+        # versions of mifconv not accepting drive letter in paths
+        if not os.path.exists( "/tmp"):
+            os.mkdir("/tmp")
+
+        import tempfile
+        fileid, mifpath = tempfile.mkstemp( suffix=".mif", dir="/tmp" )
+        if ":" in mifpath:
+            mifpath = mifpath.split(":")[-1]
+        cmd = convert_icons_cmd % ( mifpath, abspath(source_icon) )
+
+        # TODO: Use colorizer
+        print( cmd )
+        err = os.system( cmd )
+
+        import shutil
+        print( "scons: Copying temporary '%s' to '%s'" % (mifpath, target_icon ) )
+        shutil.copyfile( mifpath, target_icon )
+
+        # Close so we can remove it
+        os.close(fileid)
+        os.remove(mifpath)
+    else:
+        # TODO: Use source[0].rel_path ?
+        from relpath import relpath
+        source_icon = relpath(os.getcwd(), source[0].tpath)
+        target_icon = target[0].tpath
+
+        cmd = convert_icons_cmd % ( target_icon, source_icon )
+        #import pdb;pdb.set_trace()
+        # TODO: Use colorizer
+        print( cmd )
+        err = os.system( cmd )
+
+    return err
+
+@publicapi
+def SymbianIconBuilder(target, source, env = None ):
+    """ Runs Command with SymbianIconCommand handler """
+    if not env: env = DefaultEnvironment()
+
+    icon_name   = source
+    source_icon = source
+
+    icon_name   = abspath( icon_name )
+    source_icon = abspath( source_icon )
+
+    # Execute convert
+    if os.name == "posix":
+        # Linux's mifconv fails with absolute paths without
+        source_icon = "/"+source_icon
+
+    return env.Command( target, source, SymbianIconCommand )
+
+@publicapi
+def SymbianIcon(icon, env = None, package = None, package_drive_map = None ):
+    """
+    Converts a single icon and installs it to default locations
+
+    Example:
+    >>> SymbianIcon( "myicon.svg", package = "myapp")
+    => Creates myicon_aif.mif
+    >>> SymbianIcon( ("myicon.svg", "renamed.mif"), package = "myapp" )
+    => Creates renamed_aif.mif
+    
+    @param icon: The path to the source icon.
+                 Also accepts 2-tuple( <source>, <new name> ) for custom 
+                 name for the resulting icon.
+    @param package: Name of the package.
+    
+    @return: Dict containing:
+        {
+            "result"    : <path of the result under build dir>,
+            "installed" : tuple( <locations where the icon was installed to>)
+        }
+    @rtype: dict
+    """
+    if not env: env = DefaultEnvironment()
+
+    if type( icon ) == tuple:
+        target_icon = icon[1]
+        source_icon = icon[0]
+    else:
+        # Remove the extension from the file name
+        target_icon = ".".join(icon.split(".")[:-1])
+        source_icon = icon
+
+    # Set target path
+    template    = join( SymbianTargetPath("icons"), "%s_aif.mif" )
+    target_icon = template % ( target_icon )
+
+    # Convert
+    SymbianIconBuilder(target_icon, source_icon, env = env)
+
+    # Install to default locations
+    sdk_data = join(ARGS.INSTALL_EPOC32_DATA, "Z", "resource","apps/")
+    sdk_rel  = join(ARGS.INSTALL_EPOC32_RELEASE, "z", "resource", "apps" )
+
+    env.Install( sdk_rel,  target_icon )
+    env.Install( sdk_data, target_icon )
+
+    if package:
+        ToPackage( env  = env,
+                target  = join( "resource", "apps" ),
+                source  = source_icon,
+                package = package,
+                package_drive_map = package_drive_map,
+                toemulator = False )
+
+    return {"result" : target_icon, "installed" : (sdk_data, sdk_rel) }
+
 @publicapi
 def SymbianProgram( target, targettype = None, #IGNORE:W0621
                     sources = None, includes = None,
@@ -659,55 +788,8 @@ class SymbianProgramHandler(object):
 
         return True
 
-    def _doConvertIcons( self, env, target, source):
-
-        # Creates 32 bit icons
-        convert_icons_cmd = ( ARGS.EPOCROOT + r'epoc32/tools/mifconv "%s" /c32 "%s"' ).replace( "\\", "/" )
-
-        if os.name == 'nt':
-            source_icon = source[0].abspath
-            target_icon = target[0].abspath
-
-
-            # Copy the file to current drive. This fixes also issues with some(old)
-            # versions of mifconv not accepting drive letter in paths
-            if not os.path.exists( "/tmp"):
-                os.mkdir("/tmp")
-
-            import tempfile
-            fileid, mifpath = tempfile.mkstemp( suffix=".mif", dir="/tmp" )
-            if ":" in mifpath:
-                mifpath = mifpath.split(":")[-1]
-            cmd = convert_icons_cmd % ( mifpath, abspath(source_icon) )
-
-            # TODO: Use colorizer
-            print( cmd )
-            err = os.system( cmd )
-
-            import shutil
-            print( "scons: Copying temporary '%s' to '%s'" % (mifpath, target_icon ) )
-            shutil.copyfile( mifpath, target_icon )
-
-            # Close so we can remove it
-            os.close(fileid)
-            os.remove(mifpath)
-        else:
-            # TODO: Use source[0].rel_path ?
-            from relpath import relpath
-            source_icon = relpath(os.getcwd(), source[0].tpath)
-            target_icon = target[0].tpath
-
-            cmd = convert_icons_cmd % ( target_icon, source_icon )
-            #import pdb;pdb.set_trace()
-            # TODO: Use colorizer
-            print( cmd )
-            err = os.system( cmd )
-
-        return err
-
     def _handleIcons(self):
         """Sets self.converted_icons"""
-        #TODO: Create main interface SymbianIcon for generic icons
 
         # Copy for emulator at the end using this list, just like binaries.
         self.converted_icons = []
@@ -715,58 +797,11 @@ class SymbianProgramHandler(object):
         if self.icons is None:
             return
 
-        sdk_data_resource = join(ARGS.INSTALL_EPOCROOT,
-                                 r"epoc32/DATA/Z/resource/apps/%s")
-        sdk_resource = join( ARGS.INSTALL_EPOCROOT + r"epoc32", "release", ARGS.COMPILER,
-                         ARGS.INSTALL_EPOC32_RELEASE, "z", "resource", "apps", "%s" )
+        for icon in self.icons:
+            paths = SymbianIcon( icon, package = self.package, env = self._env )
+            self.converted_icons.append( paths["result"] )
 
-        icon_target_path = join( self.output_folder, "%s_aif.mif" )
-        icon_targets = [] # Icons at WINSCW/...
-        sdk_icons = [] # Icons at /epoc32
-        copyres_cmds = [] # Commands to copy icons from WINSCW/ to /epoc32
-
-        for x in self.icons:
-
-            # Accepts 2-tuple, first is the source, second: resulting name
-            tmp = ""
-            icon_name = x
-            source_icon = x
-
-            if type( x ) == tuple:
-                icon_name = x[1]
-                source_icon = x[0]
-            else:
-                # Strip the extension from the file name
-                icon_name = ".".join(icon_name.split(".")[:-1])
-            tmp = icon_target_path % ( icon_name )
-            icon_targets.append( tmp )
-
-            icon_name = abspath( icon_name )
-            source_icon = abspath( source_icon )
-
-            # Execute convert
-            if os.name == "posix":
-                # Linux's mifconv fails with absolute paths without
-                source_icon = "/"+source_icon
-
-            self._env.Command( tmp, source_icon, self._doConvertIcons)
-
-            iconfilename = os.path.basename( tmp )
-            # TODO: Use Install instead. Copy does not seem to work if there are changes.
-            sdk_target = sdk_resource % iconfilename
-            copyres_cmds.append( Copy( sdk_target, tmp ) )
-            sdk_icons.append( sdk_target )
-
-            sdk_target = sdk_data_resource % iconfilename
-            copyres_cmds.append( Copy( sdk_target, tmp ) )
-            sdk_icons.append( sdk_target )
-
-            ToPackage( self._env, self.package_drive_map, self.package,
-                join( "resource", "apps" ),
-                tmp, toemulator = False )
-
-        self._env.Command( sdk_icons, icon_targets, copyres_cmds )
-        self.converted_icons = sdk_icons
+        return True
 
     def _copyResultBinary(self):
         """Copy the linked binary( exe, dll ) for emulator
@@ -1179,8 +1214,7 @@ class SymbianProgramHandler(object):
             self._importMMP()
 
         # After mmp import
-        self.output_folder = get_output_folder( ARGS.COMPILER, ARGS.RELEASE, self.target, self.targettype )
-        self.output_folder = os.path.abspath(self.output_folder)
+        self.output_folder = SymbianTargetPath( self.target, self.targettype )
 
         if self.includes is None:
             self.includes = []
