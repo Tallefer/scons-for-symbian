@@ -970,8 +970,8 @@ class SymbianProgramHandler(object):
             for libname in self.libraries:
                 env.Depends( build_prog, libname )
 
-            env.Depends( build_prog, [ join( ARGS.INSTALL_EPOC32, "release", "armv5", "lib",
-                                            libname ) for libname in self.user_libraries] )
+            for libname in self.user_libraries:
+                env.Depends( build_prog, libname )
 
             # Mark the lib as a resultable also
             resultables = [ self._result_template % ( "" ) ]

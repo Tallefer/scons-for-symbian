@@ -168,7 +168,7 @@ def create_environment( target,
                     """
 
     LINKFLAGS += r"""
-                  -Map %(EPOCROOT)sepoc32/release/gcce/urel/%(TARGET)s.%(TARGETTYPE)s.map
+                  -Map %(INSTALL_EPOCROOT)s/epoc32/release/gcce/%(RELEASE)s/%(TARGET)s.%(TARGETTYPE)s.map
                   """
 
     LINKFLAGS = textwrap.dedent( LINKFLAGS )
@@ -178,7 +178,9 @@ def create_environment( target,
                              "UID3"   : uid3,
                              "TARGET" : target,
                              "TARGETTYPE"   : targettype,
-                             "EPOCROOT" : EPOCROOT }
+                             "EPOCROOT" : ARGS.EPOCROOT,
+                             "INSTALL_EPOCROOT" : ARGS.INSTALL_EPOCROOT,
+                             "RELEASE" : ARGS.RELEASE }
 
     #--vid=0x00000000
     ELF2E32 = r"""
@@ -230,7 +232,7 @@ def create_environment( target,
             defconfig += ["--definput " + definput]
         defconfig += ["--defoutput " + defoutput ]
         defconfig += ["--unfrozen" ]
-        defconfig += ["--dso " + os.environ["EPOCROOT"] + "epoc32/release/ARMV5/LIB/" + target + ".dso"]
+        defconfig += ["--dso " + ARGS.INSTALL_EPOCROOT + "epoc32/release/ARMV5/LIB/" + target + ".dso"]
         defconfig = " ".join( defconfig )
 
         uid1 = TARGETTYPE_UID_MAP[TARGETTYPE_DLL]#"0x10000079" # DLL
