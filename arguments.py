@@ -402,7 +402,7 @@ def checkGCCE():
 # Check if GCCE setup is correct
 #if len( PATH_ARM_TOOLCHAIN ) > 0:
 #    PATH_ARM_TOOLCHAIN = PATH_ARM_TOOLCHAIN[0]
-if COMPILER == COMPILER_GCCE and RUNNING_SCONS:
+if RUNNING_SCONS:
     if not checkGCCE():
         print "\nERROR"
         print "-" * 79

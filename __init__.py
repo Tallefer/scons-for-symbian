@@ -15,3 +15,8 @@ __author__    = "Jussi Toivola"
 __license__   = "MIT License"
 
 from scons_symbian import *
+
+# Initialize the scons tools
+import scons_tools
+
+scons_tools.initialize()
