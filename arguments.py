@@ -323,14 +323,16 @@ if SYMBIAN_VERSION[0] > 8:
 # Add S60 macros
 EXTRA_DEFINES = []
 if UI_PLATFORM == UI_PLATFORM_S60:
-    STANDARD_DEFINES += [ "__SERIES60_%d%d__" % UI_VERSION ]
+    STANDARD_DEFINES += [ "__SERIES60_%d%d__" % UI_VERSION ]    
     STANDARD_DEFINES += [ "__SERIES60_%dX__" % UI_VERSION[0] ]
-
+    STANDARD_DEFINES += [ "__S60_%d%d__" % UI_VERSION ]
+    STANDARD_DEFINES += [ "__S60_%dX__" % UI_VERSION[0] ]
+    
     # Special rules for 5th edition
     # __S60_3X__ and __SERIES60_3X__ are correct here
     # TODO: Should these be read from e32plat.pl directly?
     if UI_VERSION[0] == 5:
-        STANDARD_DEFINES += ['__S60_50__','__S60_3X__','__SERIES60_3X__']
+        STANDARD_DEFINES += ['__S60_3X__','__SERIES60_3X__']
 
     # Not in regular build scripts
     EXTRA_DEFINES += [ "__SERIES60__" ]
