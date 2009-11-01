@@ -860,7 +860,7 @@ class SymbianProgramHandler(object):
         return installed
 
     #TODO: Create main interface SymbianResource for special resource compiling
-    def _convertResources( self ):
+    def _convertResources( self, extra_depends = None):
         """
         Compile resources and copy for sis creation and for simulator.
         Sets self.resource_headers, self.converted_resources.
@@ -900,7 +900,8 @@ class SymbianProgramHandler(object):
                              "-m045,046,047",
                              self.sysincludes + self.includes,
                              [ARGS.PLATFORM_HEADER],
-                             self.rssdefines )
+                             self.rssdefines,
+                             extra_depends )
 
                 self._env.Depends( res_compile_command, self.converted_icons )
 
@@ -1351,7 +1352,7 @@ class SymbianProgramHandler(object):
         self._handleIcons()
 
         #---------------------------------------------------- Convert resource files
-        self._convertResources()
+        self._convertResources(extra_depends = self.extra_depends)
 
         # To be copied to /epoc32/release/WINSCW/UDEB/
         self.output_libpath = None
