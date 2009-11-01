@@ -960,7 +960,7 @@ class SymbianProgramHandler(object):
         if output_lib:
             libname = self.target + ".dso"
             self.output_libpath = ( join(ARGS.INSTALL_EPOCROOT,
-                                   r"/epoc32/release/%s/%s/%s" % ( "armv5", "lib", libname ) ) )
+                                   r"epoc32/release/%s/%s/%s" % ( "armv5", "lib", libname ) ) )
 
         build_prog = None
         if self.targettype != ARGS.TARGETTYPE_LIB:
