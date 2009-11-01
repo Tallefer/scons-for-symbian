@@ -1,0 +1,99 @@
+#!/bin/bash
+
+# declare array with new 
+declare -a newargs
+i=0
+
+# we modified scons for symbian not to add -x c or -x c++
+# when using distcc, because it confuses distcc, now we 
+# have to add it, later we will modify it depending if
+# source file is c or cpp
+# cpp files are compiled with -W-no-ctor-dtor-privacy and
+# if this exists then we are compiling cpp
+newargs[$i]="-x"
+((i++))
+newargs[$i]="c"
+# remember position where is c/cpp type flag
+comp=$i
+((i++))
+
+# Flag idicating if this script is run by server
+RUNFROM="SERVER"
+ISCPP="NO "
+
+# first detect if we are called from client (distcc)
+# or from server (distccd)
+
+for arg in "$@"
+do 
+	# distcc do not pass -nostdinc, so if we have this
+	# argument then we know we are called from client (distcc)
+	if [ "X${arg}" = "X-nostdinc" ] ; then
+		RUNFROM="CLIENT"
+	fi
+	# for CPP scons for symbian adds -W-no-ctor-dtor-privacy
+	# this way we detect if it is cpp or c
+	if [ "X${arg}" = "X-Wno-ctor-dtor-privacy" ] ; then
+		ISCPP="YES"
+	fi
+done
+
+
+if [ $RUNFROM = "SERVER" ] ; then
+	# do over all paramteres and if parameter begins with
+	# /tmp change it to c:\cygwin\tmp so that arm compiler
+	# which is not cygwin aware can access our temp directory
+	for arg in "$@"
+	do 
+		#if [ "X${arg:0:5}" = "X/tmp/" ] ; then
+		#	tmp="c:\\cygwin\\tmp\\"${arg:5}
+		#	newargs[$i]=$tmp
+		#	((i++))
+		#else
+		newargs[$i]=$arg
+		((i++))
+		#fi
+	done
+	
+	# -nosrdinc is not passed by distcc to distccd
+	# so we add it now
+	newargs[$i]="-nostdinc"
+	((i++))
+fi
+
+if [ $RUNFROM = "CLIENT" ] ; then
+	# if this script is run from client, just copy
+	# received arguments
+	for arg in "$@"
+	do 
+		newargs[$i]=$arg
+		((i++))
+	done
+fi
+
+# we modified scons for symbian not to add -x c or -x c++
+# when using distcc, because it confuse distcc, now we 
+# have to set it 
+if [ $ISCPP = "YES" ] ; then
+	newargs[$comp]="c++"
+else
+	newargs[$comp]="c"
+fi
+
+# print items in list
+#for item in ${newargs[*]}
+#do
+#	printf "%s\n" $item
+#done
+
+#echo "Called from $RUNFROM: arm-none-symbianelf-g++.exe ${newargs[@]}"
+
+# write to file for this script debugging purpose
+#echo "$ISCPP `/bin/date` Called from $RUNFROM: arm-none-symbianelf-g++.exe ${newargs[@]}" >> /tmp/debug.txt
+
+# lets compile now
+exec arm-none-symbianelf-g++ ${newargs[@]}
+
+# write to file indicating that compiler finished
+#echo "done" >> /tmp/debug.txt
+

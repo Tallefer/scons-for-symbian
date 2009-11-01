@@ -17,6 +17,11 @@ from os.path import join
 import os
 import textwrap
 
+USE_DISTCC = False
+if "DISTCC_HOSTS" in os.environ:
+  if os.environ["DISTCC_HOSTS"] != "":
+    USE_DISTCC= True
+
 DEFAULT_GCCE_DEFINES = DEFAULT_SYMBIAN_DEFINES[:]
 DEFAULT_GCCE_DEFINES += [
                         "__GCCE__",
@@ -24,6 +29,8 @@ DEFAULT_GCCE_DEFINES += [
                         "__MARM__",
                         "__EABI__",
                         "__MARM_ARMV5__",
+                        ( "__PRODUCT_INCLUDE__", r'%s' % PLATFORM_HEADER.replace("\\", "/") )
+                          if USE_DISTCC else
                         ( "__PRODUCT_INCLUDE__", r'\"%s\"' % PLATFORM_HEADER.replace("\\", "/") )
                         ]
 
@@ -249,11 +256,22 @@ def create_environment( target,
                     LIBPREFIX = "",
 
                     # Compiler settings
-                    CC = r'arm-none-symbianelf-g++',
-                    CFLAGS = WARNINGS_C + " " + gcce_options + " -x c -include " + COMPILER_INCLUDE,
 
-                    CXX = r'arm-none-symbianelf-g++',
-                    CXXFLAGS = WARNINGS_CXX + " " + gcce_options + " -x c++ -include %s " % ( COMPILER_INCLUDE ),
+                    CC = (r'\cygwin\bin\distcc.exe arm-none-symbianelf-g++.wrapper')
+                           if USE_DISTCC else
+                         (r'arm-none-symbianelf-g++'),
+
+                    CFLAGS = (WARNINGS_C + " " + gcce_options + " -include " + COMPILER_INCLUDE)
+                             if USE_DISTCC else
+                             (WARNINGS_C + " " + gcce_options + " -x c -include " + COMPILER_INCLUDE),
+
+                    CXX = (r'\cygwin\bin\distcc.exe arm-none-symbianelf-g++.wrapper')
+                            if USE_DISTCC else                    
+                          (r'arm-none-symbianelf-g++'),
+
+                    CXXFLAGS = (WARNINGS_CXX + " " + gcce_options + " -include %s " % ( COMPILER_INCLUDE ))
+                                 if USE_DISTCC else
+                               (WARNINGS_CXX + " " + gcce_options + " -x c++ -include %s " % ( COMPILER_INCLUDE )),
 
                     # isystem does not work so just adding the system include paths before normal includes.
                     CPPPATH = sysincludes + includes,
@@ -280,8 +298,13 @@ def create_environment( target,
     env.Replace(
         ENV = os.environ,
 
-        CFLAGS = WARNINGS_C + " " + gcce_options + " -x c -include " + COMPILER_INCLUDE,
-        CXXFLAGS = WARNINGS_CXX + " " + gcce_options + " -x c++ -include %s " % ( COMPILER_INCLUDE ),
+        CFLAGS = (WARNINGS_C + " " + gcce_options + " -include " + COMPILER_INCLUDE)
+                   if USE_DISTCC else
+                 (WARNINGS_C + " " + gcce_options + " -x c -include " + COMPILER_INCLUDE),
+
+        CXXFLAGS = (WARNINGS_CXX + " " + gcce_options + " -include %s " % ( COMPILER_INCLUDE ))
+                     if USE_DISTCC else
+                   (WARNINGS_CXX + " " + gcce_options + " -x c++ -include %s " % ( COMPILER_INCLUDE )),
 
         # isystem does not work so just adding the system include paths before normal includes.
         CPPPATH = sysincludes + includes,
