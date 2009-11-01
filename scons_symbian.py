@@ -514,70 +514,47 @@ def SymbianIconCommand(env, target, source):
     """SCons command for running the mifconv icon conversion tool."""
     
     # Creates 32 bit icons
-    convert_icons_cmd = ( ARGS.EPOCROOT + r'epoc32/tools/mifconv "%s" /c32 "%s"' ).replace( "\\", "/" )
+    convert_icons_cmd = ( ARGS.EPOCROOT + r'epoc32/tools/mifconv "%s"' ).replace( "\\", "/" )
 
     if os.name == 'nt':
-        source_icon = source[0].abspath
-        target_icon = target[0].abspath
-
-        # Copy the file to current drive. This fixes also issues with some(old)
-        # versions of mifconv not accepting drive letter in paths
-        if not os.path.exists( "/tmp"):
-            os.mkdir("/tmp")
-
-        import tempfile
-        fileid, mifpath = tempfile.mkstemp( suffix=".mif", dir="/tmp" )
-        if ":" in mifpath:
-            mifpath = mifpath.split(":")[-1]
-        cmd = convert_icons_cmd % ( mifpath, abspath(source_icon) )
-
-        # TODO: Use colorizer
-        print( cmd )
-        err = os.system( cmd )
-
-        import shutil
-        print( "scons: Copying temporary '%s' to '%s'" % (mifpath, target_icon ) )
-        shutil.copyfile( mifpath, target_icon )
-
-        # Close so we can remove it
-        os.close(fileid)
-        os.remove(mifpath)
+        source_icons   = source
+        target_miffile = target[0].abspath
+        if ":" in target_miffile:
+          target_miffile = target_miffile.split(":")[-1]
     else:
         # TODO: Use source[0].rel_path ?
         from relpath import relpath
-        source_icon = relpath(os.getcwd(), source[0].tpath)
-        target_icon = target[0].tpath
+        source_icons = []
+        for icon in source:
+          source_icons.append(relpath(os.getcwd(), icon.tpath))
+        target_miffile = target[0].tpath
 
-        cmd = convert_icons_cmd % ( target_icon, source_icon )
-        #import pdb;pdb.set_trace()
+    cmd = convert_icons_cmd % ( target_miffile )
+    if len(target) > 1:
+      mbg_filename = target[1].abspath
+      cmd += r' /h"' + mbg_filename + r'"'
+
+    if SYMBIAN_VERSION[0] == 9 and SYMBIAN_VERSION[1] == 3:
+      cmd += r' /S' + ARGS.EPOCROOT + r'epoc32/tools'
+
+    for icon in source_icons:
+      cmd += r' /c32,1 "' + icon.abspath + r'"'
+
         # TODO: Use colorizer
-        print( cmd )
-        err = os.system( cmd )
-
-    return err
+    print cmd
+    return os.system( cmd )
 
 @publicapi
 def SymbianIconBuilder(target, source, env = None ):
     """ Runs Command with SymbianIconCommand handler """
     if not env: env = DefaultEnvironment()
 
-    icon_name   = source
-    source_icon = source
-
-    icon_name   = abspath( icon_name )
-    source_icon = abspath( source_icon )
-
-    # Execute convert
-    if os.name == "posix":
-        # Linux's mifconv fails with absolute paths without
-        source_icon = "/"+source_icon
-
     return env.Command( target, source, SymbianIconCommand )
 
 @publicapi
-def SymbianIcon(icon, env = None, package = None, package_drive_map = None ):
+def SymbianIcon(icons, env = None, mif_filename = None, mbg_filename = None, package = None, package_drive_map = None ):
     """
-    Converts a single icon and installs it to default locations
+    Converts a single icon or list of iccons and installs it to default or specified location
 
     Example:
     >>> SymbianIcon( "myicon.svg", package = "myapp")
@@ -585,9 +562,13 @@ def SymbianIcon(icon, env = None, package = None, package_drive_map = None ):
     >>> SymbianIcon( ("myicon.svg", "renamed"), package = "myapp" )
     => Creates renamed_aif.mif
     
-    @param icon: The path to the source icon.
-                 Also accepts 2-tuple( <source>, <new name> ) for custom 
-                 name for the resulting icon.
+    @param icons: Path to single icon, or list of paths to multiple icons.
+	@param mif_filename: Target mif file (without extension).
+	                     If path not specified default path will be used.
+	                     If parameter not specified, mif filename will be generated from first icon.
+	@param mbg_filename  Target header file to be created.
+	                     If path not specified default path will be used.
+	                     If parameter not specified, mif filename will be generated from first icon.
     @param package: Name of the package.
     
     @return: Dict containing:
@@ -599,37 +580,60 @@ def SymbianIcon(icon, env = None, package = None, package_drive_map = None ):
     """
     if not env: env = DefaultEnvironment()
 
-    if type( icon ) == tuple:
-        target_icon = icon[1]
-        source_icon = icon[0]
-    else:
-        # Remove the extension from the file name
-        target_icon = ".".join(icon.split(".")[:-1])
-        source_icon = icon
+    target_miffile = mif_filename;
+
+    source_icons = icons
+    if type(icons) == str:
+      source_icons = [ icons ]
+
 
     # Set target path
+    if mif_filename is None:
     template    = join( SymbianTargetPath("icons"), "%s_aif.mif" )
-    target_icon = template % ( target_icon )
+      target_miffile = template % ( target_icons[0] )
+    else:
+      if mif_filename.find('/') != -1:
+        target_miffile = abspath(mif_filename) + ".mif"
+      else:
+        template    = join( SymbianTargetPath("icons"), "%s.mif" )
+        target_miffile = template % ( mif_filename )
 
     # Convert
-    SymbianIconBuilder(target_icon, source_icon, env = env)
+    resultables = [ target_miffile ]
+
+    target_mbg = None
+    if mbg_filename is not None:
+      template    = join( SymbianTargetPath("icons"), "%s.mbg" )
+      target_mbg  = template % ( mbg_filename )
+      resultables.append(target_mbg)
+
+    env.SideEffect("dont_build_more_mifs_at_same_time.txt", resultables)
+    
+    SymbianIconBuilder(resultables, source_icons, env = env)
 
     # Install to default locations
     sdk_data = join(ARGS.INSTALL_EPOC32_DATA, "Z", "resource","apps/")
     sdk_rel  = join(ARGS.INSTALL_EPOC32_RELEASE, "z", "resource", "apps" )
 
-    env.Install( sdk_rel,  target_icon )
-    env.Install( sdk_data, target_icon )
+    env.Install( sdk_rel,  target_miffile )
+    env.Install( sdk_data, target_miffile )
+
+    if target_mbg is not None:
+      sdk_inc  = ARGS.INSTALL_EPOC32_INCLUDE
+      env.Install( sdk_inc, target_mbg )
+      # return copied name as result
+      target_mbg = os.path.basename(target_mbg)
+      target_mbg = os.path.join(ARGS.INSTALL_EPOC32_INCLUDE, target_mbg).replace("\\", "/")
 
     if package:
         ToPackage( env  = env,
                 target  = join( "resource", "apps" ),
-                source  = source_icon,
+                source  = source_icons,
                 package = package,
                 package_drive_map = package_drive_map,
                 toemulator = False )
 
-    return {"result" : target_icon, "installed" : (sdk_data, sdk_rel) }
+    return { "result" : target_miffile, "header" : target_mbg, "installed" : (sdk_data, sdk_rel) }
 
 @publicapi
 def SymbianProgram( target, targettype = None, #IGNORE:W0621
