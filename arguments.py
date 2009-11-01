@@ -113,10 +113,9 @@ def ResolveInstallDirectories():
   #: Constant pointing to emulator c drive
   INSTALL_EMULATOR_C = join( EPOC32, "winscw", "c" )
   #: Default include folders
-  SYSTEM_INCLUDES = [ EPOC32_INCLUDE,
-                      join( EPOC32_INCLUDE, "variant" ),
-                      INSTALL_EPOC32_INCLUDE,
-                  ]
+  SYSTEM_INCLUDES = [ INSTALL_EPOC32_INCLUDE,
+                      EPOC32_INCLUDE,
+                      join( EPOC32_INCLUDE, "variant" ) ]
   #: SDK Installation folder
   SDKFOLDER = os.path.join( INSTALL_EPOCROOT,
                                  "epoc32",
