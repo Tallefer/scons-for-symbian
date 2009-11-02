@@ -534,9 +534,6 @@ def SymbianIconCommand(env, target, source):
       mbg_filename = target[1].abspath
       cmd += r' /h"' + mbg_filename + r'"'
 
-    if SYMBIAN_VERSION[0] == 9 and SYMBIAN_VERSION[1] == 3:
-      cmd += r' /S' + ARGS.EPOCROOT + r'epoc32/tools'
-
     for icon in source_icons:
       cmd += r' /c32,1 "' + icon.abspath + r'"'
 
