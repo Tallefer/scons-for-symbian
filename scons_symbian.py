@@ -586,7 +586,7 @@ def SymbianIcon(icons, env = None, mif_filename = None, mbg_filename = None, pac
 
     # Set target path
     if mif_filename is None:
-    template    = join( SymbianTargetPath("icons"), "%s_aif.mif" )
+      template    = join( SymbianTargetPath("icons"), "%s_aif.mif" )
       target_miffile = template % ( target_icons[0] )
     else:
       if mif_filename.find('/') != -1:

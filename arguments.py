@@ -357,7 +357,10 @@ else:
     DEFAULT_SYMBIAN_DEFINES.append( "_DEBUG" )
 
 def get_output_folder( compiler, release, target, targettype ):
-    p = os.path.join( "build" + "%d_%d" % SYMBIAN_VERSION, compiler + "_" + release, target + "_" + targettype )
+    if _set_install_epocroot is not None:
+      p = os.path.join( _set_install_epocroot, compiler + "_" + release, target + "_" + targettype)
+    else:
+      p = os.path.join( "build" + "%d_%d" % SYMBIAN_VERSION, compiler + "_" + release, target + "_" + targettype )
     return os.path.abspath( p )
 
 # Generate help message
