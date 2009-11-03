@@ -514,7 +514,10 @@ def SymbianIconCommand(env, target, source):
     """SCons command for running the mifconv icon conversion tool."""
     
     # Creates 32 bit icons
-    convert_icons_cmd = ( ARGS.EPOCROOT + r'epoc32/tools/mifconv "%s"' ).replace( "\\", "/" )
+    if 'custom_mifconv' in env:
+      convert_icons_cmd = (env['custom_mifconv'] + r' "%s"').replace( "\\", "/" )
+    else:
+      convert_icons_cmd = ( ARGS.EPOCROOT + r'epoc32/tools/mifconv "%s"' ).replace( "\\", "/" )
 
     if os.name == 'nt':
         source_icons   = source
@@ -534,6 +537,11 @@ def SymbianIconCommand(env, target, source):
       mbg_filename = target[1].abspath
       cmd += r' /h"' + mbg_filename + r'"'
 
+    # This is needed if you have mifconv on different
+    # drive then sources    
+    if SYMBIAN_VERSION[0] == 9 and SYMBIAN_VERSION[1] == 3:
+      cmd += r' /S' + ARGS.EPOCROOT + r'epoc32/tools'
+      
     for icon in source_icons:
       cmd += r' /c32,1 "' + icon.abspath + r'"'
 
@@ -542,14 +550,15 @@ def SymbianIconCommand(env, target, source):
     return os.system( cmd )
 
 @publicapi
-def SymbianIconBuilder(target, source, env = None ):
+def SymbianIconBuilder(target, source, env = None, custom_mifconv = None ):
     """ Runs Command with SymbianIconCommand handler """
     if not env: env = DefaultEnvironment()
+    env['custom_mifconv'] = custom_mifconv
 
     return env.Command( target, source, SymbianIconCommand )
 
 @publicapi
-def SymbianIcon(icons, env = None, mif_filename = None, mbg_filename = None, package = None, package_drive_map = None ):
+def SymbianIcon(icons, env = None, mif_filename = None, mbg_filename = None, package = None, package_drive_map = None, custom_mifconv = None ):
     """
     Converts a single icon or list of iccons and installs it to default or specified location
 
@@ -606,7 +615,7 @@ def SymbianIcon(icons, env = None, mif_filename = None, mbg_filename = None, pac
 
     env.SideEffect("dont_build_more_mifs_at_same_time.txt", resultables)
     
-    SymbianIconBuilder(resultables, source_icons, env = env)
+    SymbianIconBuilder(resultables, source_icons, env = env, custom_mifconv = custom_mifconv)
 
     # Install to default locations
     sdk_data = join(ARGS.INSTALL_EPOC32_DATA, "Z", "resource","apps/")
