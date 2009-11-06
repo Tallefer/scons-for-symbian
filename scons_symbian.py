@@ -964,7 +964,7 @@ class SymbianProgramHandler(object):
     def _handleGCCEBuild(self):
         env = self._env
         output_lib   = ( self.targettype in ARGS.DLL_TARGETTYPES )
-        elf_dll_path = self._result_template % ( "._elf_" + self.targettype )
+        elf_dll_path = self._result_template % ( ".sym" )
         resultables  = [ elf_dll_path  ]
 
         if output_lib:
