@@ -58,3 +58,23 @@ before starting scons set DISTCC_HOSTS environment variable, e.g.:
 set DISTCC_HOSTS="192.168.0.1 192.168.0.2 192.168.0.3"
 
 Enjoy distributed symbian scons building :)
+
+KNOWN PROBLEM 1 (and solution):
+To avoid mifconv poping error when building for FP copy mifconv from FP1 to FP2.
+Copy C:\Symbian\9.2\S60_3rd_FP1\Epoc32\tools\mifconv.exe 
+C:\S60\devices\S60_3rd_FP2_SDK_v1.1\epoc32\tools
+
+KNOWN PROBLEM 2 (and solution):
+When building with distcc for FP2, you will get error that #include expect
+filename in C:\S60\devices\S60_3rd_FP2_SDK_v1.1\epoc32\include\gcce\gcce.h
+This is because gcce.h have:
+  #if defined(__PRODUCT_INCLUDE__)
+  #include __PRODUCT_INCLUDE__
+  #endif
+Preprocessor failes to include this file, to solve this issue, change gcce.h
+to:
+  #if defined(__PRODUCT_INCLUDE__)
+  #define ___ST(b) #b
+  #define __ST(b) ___ST(b)
+  #include __ST(__PRODUCT_INCLUDE__)
+  #endif
