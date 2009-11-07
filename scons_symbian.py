@@ -514,7 +514,10 @@ def SymbianIconCommand(env, target, source):
     """SCons command for running the mifconv icon conversion tool."""
     
     # Creates 32 bit icons
-    convert_icons_cmd = ( ARGS.EPOCROOT + r'epoc32/tools/mifconv "%s"' ).replace( "\\", "/" )
+    if env['custom_mifconv']:
+        convert_icons_cmd = (env['custom_mifconv'] + r' "%s"').replace( "\\", "/" )
+    else:
+        convert_icons_cmd = ( ARGS.EPOCROOT + r'epoc32/tools/mifconv "%s"' ).replace( "\\", "/" )
 
     if os.name == 'nt':
         source_icons   = source
@@ -542,14 +545,15 @@ def SymbianIconCommand(env, target, source):
     return os.system( cmd )
 
 @publicapi
-def SymbianIconBuilder(target, source, env = None ):
+def SymbianIconBuilder(target, source, env = None, custom_mifconv = None ):
     """ Runs Command with SymbianIconCommand handler """
     if not env: env = DefaultEnvironment()
+    env['custom_mifconv'] = custom_mifconv
 
     return env.Command( target, source, SymbianIconCommand )
 
 @publicapi
-def SymbianIcon(icons, env = None, mif_filename = None, mbg_filename = None, package = None, package_drive_map = None ):
+def SymbianIcon(icons, env = None, mif_filename = None, mbg_filename = None, package = None, package_drive_map = None, custom_mifconv = None ):
     """
     Converts a single icon or list of iccons and installs it to default or specified location
 
@@ -609,7 +613,7 @@ def SymbianIcon(icons, env = None, mif_filename = None, mbg_filename = None, pac
 
     env.SideEffect("dont_build_more_mifs_at_same_time.txt", resultables)
     
-    SymbianIconBuilder(resultables, source_icons, env = env)
+    SymbianIconBuilder(resultables, source_icons, env = env, custom_mifconv = custom_mifconv)
 
     # Install to default locations
     sdk_data = join(ARGS.INSTALL_EPOC32_DATA, "Z", "resource","apps/")
