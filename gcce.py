@@ -168,7 +168,7 @@ def create_environment( target,
                     """
 
     LINKFLAGS += r"""
-                  -Map %(INSTALL_EPOCROOT)s/epoc32/release/gcce/%(RELEASE)s/%(TARGET)s.%(TARGETTYPE)s.map
+                  -Map %(INSTALL_EPOCROOT)sepoc32/release/gcce/%(RELEASE)s/%(TARGET)s.%(TARGETTYPE)s.map
                   """
 
     LINKFLAGS = textwrap.dedent( LINKFLAGS )
