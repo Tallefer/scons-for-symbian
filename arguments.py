@@ -393,6 +393,9 @@ def checkGCCE():
     for p in paths:
         try:
             items = os.listdir( p )
+        except OSError, msg:
+            print msg
+            continue
         except WindowsError, msg: # TODO: WindowsError on windows... how about linux?
             print msg
             continue
