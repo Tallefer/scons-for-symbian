@@ -67,7 +67,8 @@ def SetInstallDirectory(dir):
     msg = "You have conflicting settings for the installation directory" + "%s, %s" % (_set_install_epocroot, dir)
     raise msg
   _set_install_epocroot = dir
-
+  global PACKAGE_FOLDER
+  PACKAGE_FOLDER = abspath( join( _set_install_epocroot, "%s_%s" % ( COMPILER, RELEASE ), "packages" ) )
 
 INSTALL_EPOCROOT = None
 INSTALL_EPOC32 = None
