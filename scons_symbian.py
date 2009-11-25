@@ -514,8 +514,8 @@ def SymbianIconCommand(env, target, source):
     """SCons command for running the mifconv icon conversion tool."""
     
     # Creates 32 bit icons
-    if 'custom_mifconv' in env:
-      convert_icons_cmd = (env['custom_mifconv'] + r' "%s"').replace( "\\", "/" )
+    if env['custom_mifconv']:
+        convert_icons_cmd = (env['custom_mifconv'] + r' "%s"').replace( "\\", "/" )
     else:
         convert_icons_cmd = ( ARGS.EPOCROOT + r'epoc32/tools/mifconv "%s"' ).replace( "\\", "/" )
 
