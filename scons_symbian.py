@@ -984,6 +984,8 @@ class SymbianProgramHandler(object):
 
         build_prog = None
         if self.targettype != ARGS.TARGETTYPE_LIB:
+            mapfile = os.path.join(ARGS.INSTALL_EPOCROOT, "epoc32", "release", "gcce", ARGS.RELEASE, self.target + "." + self.targettype + ".map")
+            resultables.append(mapfile)
             build_prog = self._env.Program( resultables, self.sources )#IGNORE:E1101
 
             # Depend on the libs
@@ -1000,6 +1002,9 @@ class SymbianProgramHandler(object):
                 resultables.append( self.output_libpath )
 
             # Create final binary and lib/dso
+            if self.targettype == ARGS.TARGETTYPE_DLL:
+                deffile = self._result_template % ( "{000a0000}.def" )
+                resultables.append(deffile)
             env.Elf( resultables, elf_dll_path )#IGNORE:E1101
 
             env.Install( join(ARGS.INSTALL_EPOCROOT + r"epoc32/release/gcce/%s" % ( ARGS.RELEASE )),
