@@ -237,7 +237,7 @@ def generate(env):
                         " -soname ${TARGET}{${UID2}}[${UID3}].exe" \
                         " --entry _E32Startup -u _E32Startup" \
                         " ${EPOCROOT}epoc32/release/armv5/${RELEASE}/eexe.lib" \
-                        " -Map ${EPOCROOT}epoc32/release/gcce/${RELEASE}/${TARGET}.map "
+                        " -Map ${INSTALL_EPOCROOT}epoc32/release/gcce/${RELEASE}/${TARGET}.map "
    
     # The prefix used to specify a library directory on the linker command line. 
     env["LIBDIRPREFIX"]  = "-L"
@@ -258,7 +258,7 @@ def generate(env):
                         " -soname ${TARGET}{${UID2}}[${UID3}].dll" \
                         " --entry _E32Dll -u _E32Dll" \
                         " ${EPOCROOT}epoc32/release/armv5/${RELEASE}/edll.lib" \
-                        " -Map ${EPOCROOT}epoc32/release/gcce/${RELEASE}/${TARGET}.map "
+                        " -Map ${INSTALL_EPOCROOT}epoc32/release/gcce/${RELEASE}/${TARGET}.map "
     env['SHLINKCOM']   = shlib_action
     env['SHLIBEMITTER']= shlib_emitter
     
