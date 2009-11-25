@@ -517,31 +517,31 @@ def SymbianIconCommand(env, target, source):
     if 'custom_mifconv' in env:
       convert_icons_cmd = (env['custom_mifconv'] + r' "%s"').replace( "\\", "/" )
     else:
-      convert_icons_cmd = ( ARGS.EPOCROOT + r'epoc32/tools/mifconv "%s"' ).replace( "\\", "/" )
+        convert_icons_cmd = ( ARGS.EPOCROOT + r'epoc32/tools/mifconv "%s"' ).replace( "\\", "/" )
 
     if os.name == 'nt':
         source_icons   = source
         target_miffile = target[0].abspath
         if ":" in target_miffile:
-          target_miffile = target_miffile.split(":")[-1]
+            target_miffile = target_miffile.split(":")[-1]
     else:
         # TODO: Use source[0].rel_path ?
         from relpath import relpath
         source_icons = []
         for icon in source:
-          source_icons.append(relpath(os.getcwd(), icon.tpath))
+            source_icons.append(relpath(os.getcwd(), icon.tpath))
         target_miffile = target[0].tpath
 
     cmd = convert_icons_cmd % ( target_miffile )
     if len(target) > 1:
-      mbg_filename = target[1].abspath
-      cmd += r' /h"' + mbg_filename + r'"'
+        mbg_filename = target[1].abspath
+        cmd += r' /h"' + mbg_filename + r'"'
 
     # This is needed if you have mifconv on different
     # drive then sources    
     if SYMBIAN_VERSION[0] == 9 and SYMBIAN_VERSION[1] == 3:
       cmd += r' /S' + ARGS.EPOCROOT + r'epoc32/tools'
-      
+
     for icon in source_icons:
       cmd += r' /c32,1 "' + icon.abspath + r'"'
 
@@ -908,7 +908,7 @@ class SymbianProgramHandler(object):
                 res_compile_command = rcomp.RComp( self._env, converted_rsc, converted_rsg,
                              rss_path,
                              "-m045,046,047",
-                             self.sysincludes + self.includes,
+                             self.includes + self.sysincludes,
                              [ARGS.PLATFORM_HEADER],
                              self.rssdefines,
                              extra_depends )
@@ -1200,7 +1200,7 @@ class SymbianProgramHandler(object):
         self.target = data["target"]
         self.targettype = data["targettype"]
         self.sources = data["source"]
-        self.includes = data["systeminclude"] + data["userinclude"]
+        self.includes = data["userinclude"] + data["systeminclude"]
         self.resources = data["resources"]
         self.libraries = data["library"]
         self.uid2 = data["uid"][0]

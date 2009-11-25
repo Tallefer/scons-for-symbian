@@ -274,7 +274,7 @@ def create_environment( target,
                                (WARNINGS_CXX + " " + gcce_options + " -x c++ -include %s " % ( COMPILER_INCLUDE )),
 
                     # isystem does not work so just adding the system include paths before normal includes.
-                    CPPPATH = sysincludes + includes,
+                    CPPPATH = includes + sysincludes,
                     CPPDEFINES = defines,
                     INCPREFIX = "-I ",
 
@@ -307,7 +307,7 @@ def create_environment( target,
                    (WARNINGS_CXX + " " + gcce_options + " -x c++ -include %s " % ( COMPILER_INCLUDE )),
 
         # isystem does not work so just adding the system include paths before normal includes.
-        CPPPATH = sysincludes + includes,
+        CPPPATH = includes + sysincludes,
         CPPDEFINES = defines,
 
         # Linker settings
