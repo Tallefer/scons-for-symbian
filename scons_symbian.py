@@ -558,7 +558,7 @@ def SymbianIconBuilder(target, source, env = None, custom_mifconv = None ):
     return env.Command( target, source, SymbianIconCommand )
 
 @publicapi
-def SymbianIcon(icons, env = None, mif_filename = None, mbg_filename = None, package = None, package_drive_map = None, custom_mifconv = None ):
+def SymbianIcon(icons, package = "", env = None, mif_filename = None, mbg_filename = None, package_drive_map = None, custom_mifconv = None ):
     """
     Converts a single icon or list of iccons and installs it to default or specified location
 
