@@ -621,11 +621,13 @@ def SymbianIcon(icons, package = "", env = None, mif_filename = None, mbg_filena
     SymbianIconBuilder(resultables, source_icons, env = env, custom_mifconv = custom_mifconv)
 
     # Install to default locations
-    sdk_data = join(ARGS.INSTALL_EPOC32_DATA, "Z", "resource","apps/")
-    sdk_rel  = join(ARGS.INSTALL_EPOC32_RELEASE, "z", "resource", "apps" )
+    sdk_data   = join(ARGS.INSTALL_EPOC32_DATA, "Z", "resource","apps/")
+    sdk_rel    = join(ARGS.INSTALL_EPOC32_RELEASE, "z", "resource", "apps" )
+    packagedir = join(ARGS.PACKAGE_FOLDER, "resource", "apps" )
 
     env.Install( sdk_rel,  target_miffile )
     env.Install( sdk_data, target_miffile )
+    env.Install( packagedir, target_miffile )
 
     if target_mbg is not None:
       sdk_inc  = ARGS.INSTALL_EPOC32_INCLUDE
