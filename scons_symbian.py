@@ -565,16 +565,16 @@ def SymbianIcon(icons, env = None, mif_filename = None, mbg_filename = None, pac
     Example:
     >>> SymbianIcon( "myicon.svg", package = "myapp")
     => Creates myicon_aif.mif
-    >>> SymbianIcon( ("myicon.svg", "renamed"), package = "myapp" )
-    => Creates renamed_aif.mif
+    >>> SymbianIcon( "myicon", mif_filename = "renamed.mif", package = "myapp" )
+    => Creates renamed.mif
     
     @param icons: Path to single icon, or list of paths to multiple icons.
-	@param mif_filename: Target mif file (without extension).
-	                     If path not specified default path will be used.
-	                     If parameter not specified, mif filename will be generated from first icon.
-	@param mbg_filename  Target header file to be created.
-	                     If path not specified default path will be used.
-	                     If parameter not specified, mif filename will be generated from first icon.
+    @param mif_filename: Target mif file (without extension).
+                         If path not specified default path will be used.
+                         If parameter not specified, mif filename will be generated from first icon.
+    @param mbg_filename  Target header file to be created.
+                         If path not specified default path will be used.
+                         If parameter not specified, mif filename will be generated from first icon.
     @param package: Name of the package.
     
     @return: Dict containing:
@@ -595,14 +595,17 @@ def SymbianIcon(icons, env = None, mif_filename = None, mbg_filename = None, pac
 
     # Set target path
     if mif_filename is None:
-      template    = join( SymbianTargetPath("icons"), "%s_aif.mif" )
-      target_miffile = template % ( target_icons[0] )
+        template       = join( SymbianTargetPath("icons"), "%s_aif.mif" )
+        # Remove extension from resulting .mif
+        target_icon = ".".join( source_icons[0].split(".")[:-1])
+        target_miffile = template % ( target_icon )
+        print target_miffile, source_icons
     else:
-      if mif_filename.find('/') != -1:
-        target_miffile = abspath(mif_filename) + ".mif"
-      else:
-        template    = join( SymbianTargetPath("icons"), "%s.mif" )
-        target_miffile = template % ( mif_filename )
+        if mif_filename.find('/') != -1:
+            target_miffile = abspath(mif_filename) + ".mif"
+        else:
+            template       = join( SymbianTargetPath("icons"), "%s.mif" )
+            target_miffile = template % ( mif_filename )
 
     # Convert
     resultables = [ target_miffile ]
@@ -634,7 +637,7 @@ def SymbianIcon(icons, env = None, mif_filename = None, mbg_filename = None, pac
     if package:
         ToPackage( env  = env,
                 target  = join( "resource", "apps" ),
-                source  = source_icons,
+                source  = target_miffile,
                 package = package,
                 package_drive_map = package_drive_map,
                 toemulator = False )
@@ -808,6 +811,10 @@ class SymbianProgramHandler(object):
             return
 
         for icon in self.icons:
+            mif_filename = None
+            if type(icon) == tuple:
+                mif_filename = icon[1]
+                icon = icon[0]
             paths = SymbianIcon( icon, package = self.package, env = self._env )
             self.converted_icons.append( paths["result"] )
 
@@ -969,8 +976,9 @@ class SymbianProgramHandler(object):
 
         if output_lib:
             libname = self.target + ".dso"
-            self.output_libpath = ( join(ARGS.INSTALL_EPOCROOT,
-                                   r"epoc32/release/%s/%s/%s" % ( "armv5", "lib", libname ) ) )
+            self.output_libpath = join(ARGS.INSTALL_EPOCROOT,
+                                    "epoc32","release",
+                                    "armv5", "lib", libname )
 
         build_prog = None
         if self.targettype != ARGS.TARGETTYPE_LIB:
