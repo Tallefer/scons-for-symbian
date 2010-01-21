@@ -44,6 +44,7 @@ SYMBIAN_ARMV5_BASE_LIBRARIES += [ SYMBIAN_ARMV5_LIBPATHDSO + __x + ".dso" for __
 
 # LIBARGS must be AFTER the libraries or we get "undefined reference to `__gxx_personality_v0'" when linking
 WARNINGS_C = "-Wall -Wno-unknown-pragmas -fexceptions " \
+             "-Wno-sign-compare " \
             "-march=armv5t -mapcs -pipe -nostdinc -msoft-float"
 WARNINGS_CXX = WARNINGS_C + " -Wno-ctor-dtor-privacy"
 
@@ -88,7 +89,10 @@ def create_environment( target,
     defines = defines[:]
 
     if gcce_options is None:
+      if RELEASE == 'UREL':
         gcce_options = GCCE_OPTIMIZATION_FLAGS
+      else:
+        gcce_options = '-O0 -g'
 
     if targettype != TARGETTYPE_LIB:
         if targettype in DLL_TARGETTYPES:
@@ -175,8 +179,10 @@ def create_environment( target,
                     """
 
     LINKFLAGS += r"""
-                  -Map %(INSTALL_EPOCROOT)sepoc32/release/gcce/%(RELEASE)s/%(TARGET)s.%(TARGETTYPE)s.map
+                  -Map %(INSTALL_EPOCROOT)s/epoc32/release/gcce/%(RELEASE)s/%(TARGET)s.%(TARGETTYPE)s.map
                   """
+    if RELEASE == 'UDEB':
+      LINKFLAGS += " -g "
 
     LINKFLAGS = textwrap.dedent( LINKFLAGS )
     LINKFLAGS = " ".join( [ x.strip() for x in LINKFLAGS.split( "\n" ) ] )
@@ -199,7 +205,7 @@ def create_environment( target,
                 %(DEFCONFIG)s
                 --elfinput="%(WORKING_DIR)s$SOURCE"
                 --linkas=%(TARGET)s{000a0000}.%(TARGETTYPE)s
-                --libpath="%(EPOCROOT)sepoc32/release/armv5/lib"
+                --libpath="%(EPOCROOT)s/epoc32/release/armv5/lib"
                 """
     if allowdlldata and targettype in DLL_TARGETTYPES:
         ELF2E32 += "--dlldata "
@@ -239,7 +245,7 @@ def create_environment( target,
             defconfig += ["--definput " + definput]
         defconfig += ["--defoutput " + defoutput ]
         defconfig += ["--unfrozen" ]
-        defconfig += ["--dso " + ARGS.INSTALL_EPOCROOT + "epoc32/release/ARMV5/LIB/" + target + ".dso"]
+        defconfig += ["--dso " + ARGS.INSTALL_EPOCROOT + "/epoc32/release/ARMV5/LIB/" + target + ".dso"]
         defconfig = " ".join( defconfig )
 
         uid1 = TARGETTYPE_UID_MAP[TARGETTYPE_DLL]#"0x10000079" # DLL
@@ -257,9 +263,9 @@ def create_environment( target,
 
                     # Compiler settings
 
-                    CC = (r'\cygwin\bin\distcc.exe arm-none-symbianelf-g++.wrapper')
+                    CC = (r'\cygwin\bin\distcc.exe arm-none-symbianelf-gcc.wrapper')
                            if USE_DISTCC else
-                         (r'arm-none-symbianelf-g++'),
+                         (r'arm-none-symbianelf-gcc'),
 
                     CFLAGS = (WARNINGS_C + " " + gcce_options + " -include " + COMPILER_INCLUDE)
                              if USE_DISTCC else

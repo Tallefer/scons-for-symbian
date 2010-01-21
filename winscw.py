@@ -85,44 +85,6 @@ def make_capability_hex(capabilities):
 
 _WINSCW_ENV = None
 
-def make_default_environment():
-    global _WINSCW_ENV
-    if _WINSCW_ENV is not None:
-        return _WINSCW_ENV.Clone()
-
-    platform_header = PLATFORM_HEADER#os.path.basename( PLATFORM_HEADER )
-    #import pdb;pdb.set_trace()
-    sysincludes = " "
-    cc_flags = '-g -O0 -inline off -wchar_t off -align 4 -warnings on -w nohidevirtual,nounusedexpr -msgstyle gcc -enum int -str pool -exc ms -trigraphs on  -nostdinc'
-    _WINSCW_ENV = Environment(
-                    tools = ["mingw"], # Disable searching of tools
-
-                    CC = r'mwccsym2',
-                    CXX = r'mwccsym2',
-
-                    ENV = os.environ, #os.environ['PATH'],
-                    # Static library settings
-                    AR = r'mwldsym2',
-                    ARFLAGS = "-library -msgstyle gcc -stdlib -subsystem windows -noimplib -o",
-                    RANLIBCOM = "",
-                    LIBPREFIX = "",
-
-                    CPPPATH = "",
-                    CPPDEFINES = DEFAULT_WINSCW_DEFINES + CMD_LINE_DEFINES,
-                    CCFLAGS = cc_flags + ' -cwd source -I- %s -include "%s"' % ( sysincludes, platform_header ),
-                    INCPREFIX = "-i ",
-                    CPPDEFPREFIX = "-d ",
-
-                    # Linker settings
-                    LINK = r'mwldsym2',
-                    LINKFLAGS = "",
-                    LIBS = "",
-                    LIBLINKPREFIX = " "
-
-        )
-
-    return _WINSCW_ENV
-
 def create_environment( target,
                         targettype,
                         includes,
@@ -152,6 +114,10 @@ def create_environment( target,
         lib = libraries[x]
         if "." not in lib:
             libraries[x] = lib + ".lib"
+    for x in xrange( len( user_libraries ) ):
+        lib = user_libraries[x]
+        if "." not in lib:
+            user_libraries[x] = lib + ".lib"
 
     OUTPUT_FOLDER = get_output_folder( COMPILER, RELEASE, target, targettype )
 
@@ -175,7 +141,7 @@ def create_environment( target,
             LIBRARIES.append( join(EPOC32_RELEASE, "eexe.lib") )
     defines = [ '"%s"' % x for x in defines ]
 
-    cc_flags = '-g -O0 -inline off -align 4 -warnings on -w nohidevirtual,nounusedexpr -msgstyle gcc -enum int -str pool -exc ms -trigraphs on'
+    cc_flags = '-g -O0 -inline off -align 4 -warnings on -w noimplicit,nohidevirtual,nounusedexpr -msgstyle gcc -enum int -str pool -exc ms -trigraphs on'
     if win32_headers:
       # Win32 headers require the wchar_t type
       cc_flags += ' -stdinc -wchar_t on'

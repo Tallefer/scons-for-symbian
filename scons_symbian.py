@@ -69,6 +69,12 @@ def _finalize_symbian_scons():
     Default( ARGS.INSTALL_EPOCROOT )
     Default( "." )
 
+def _add_lib_ext(str):
+    if (str.lower().endswith(".lib")):
+      return str
+    return str + ".lib"
+
+
 loginfo( "Building", ARGS.COMPILER, ARGS.RELEASE )
 loginfo( "Defines =", ARGS.CMD_LINE_DEFINES )
 
@@ -1077,7 +1083,7 @@ class SymbianProgramHandler(object):
             build_prog = env.Program( self._result_template % ".exe", self.sources )
             env.Depends( build_prog, [ join( ARGS.EPOC32_RELEASE, libname ) for libname in self.libraries] )
             env.Depends( build_prog, [ join( ARGS.INSTALL_EPOC32_RELEASE,
-                                            libname ) for libname in self.user_libraries] )
+                                            _add_lib_ext(libname) ) for libname in self.user_libraries] )
             if ARGS.EPOCROOT != ARGS.INSTALL_EPOCROOT:
               env.Install( join(ARGS.INSTALL_EPOC32_RELEASE, "z", "sys", "bin"),
                            build_prog[0] )
@@ -1090,7 +1096,7 @@ class SymbianProgramHandler(object):
             # the depended project is automatically built first.
             env.Depends( build_prog, [ join( ARGS.EPOC32_RELEASE, libname ) for libname in self.libraries] )
             env.Depends( build_prog, [ join( ARGS.INSTALL_EPOC32_RELEASE,
-                                            libname ) for libname in self.user_libraries] )
+                                            _add_lib_ext(libname) ) for libname in self.user_libraries] )
 
         else:
             build_prog = env.StaticLibrary( self._result_template % ".lib" , self.sources )#IGNORE:E1101
@@ -1166,7 +1172,7 @@ class SymbianProgramHandler(object):
                             '-shared -subsystem %s' % win32_subsystem,
                             '-g %s' % " ".join( libs ),
                             ' %s' % " ".join( win32_libs ),
-                            '-o "%s"' % temp_dll_path,
+                            '-o "%s"' % ( self._result_template % ".dll" ),
                             '-f "%s"' % ( self._result_template % ".def" ),
                             implib,
                             '-addcommand "out:%s.%s"' % ( self.target, self.targettype ),
